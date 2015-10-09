@@ -86,15 +86,16 @@ int main(int argc, char* argv[])
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
     initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
-
+    speed_t2 sp[2];
+    sp[0].spd = cells;
+    sp[1].spd = tmp_cells;
     /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
-
     for (ii = 0; ii < params.max_iters; ii++)
     {
-        timestep(params, accel_area, cells, tmp_cells, obstacles);
-        av_vels[ii] = av_velocity(params, cells, obstacles);
+        timestep(params, accel_area, sp[ii%2].spd, sp[(ii+1)%2].spd, obstacles);
+        av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
 
         #ifdef DEBUG
             printf("==timestep: %d==\n", ii);

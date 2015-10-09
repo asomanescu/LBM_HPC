@@ -31,6 +31,10 @@ typedef struct {
     float speeds[NSPEEDS];
 } speed_t;
 
+typedef struct {
+    speed_t *spd;
+} speed_t2;
+
 typedef enum { ACCEL_ROW, ACCEL_COLUMN } accel_e;
 typedef struct {
     accel_e col_or_row;

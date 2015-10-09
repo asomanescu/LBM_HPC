@@ -196,6 +196,15 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     w2 = params->density      /36.0;
 
     /* Initialise arrays */
+    // for (ii = 0; ii< (params->ny*params->nx); i++) {
+    //     (*cells_ptr)[ii] = w0;
+    // }
+    // for (ii = (params->ny*params->nx); ii < (params->ny*params->nx*5); i++) {
+    //     (*cells_ptr)[ii] = w1;
+    // }
+    // for (ii = (params->ny*params->nx*5); ii < (params->ny*params->nx*9); i++) {
+    //     (*cells_ptr)[ii] = w2;
+    // }
     for (ii = 0; ii < params->ny; ii++)
     {
         for (jj = 0; jj < params->nx; jj++)
