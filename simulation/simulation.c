@@ -2,7 +2,7 @@
 
 #include <math.h>
 #include <stdio.h>
-
+#include <omp.h>
 #include "lbm.h"
 
 float timestep(const param_t params, const accel_area_t accel_area,
@@ -136,26 +136,30 @@ void rebound(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obst
 
 float collision(const param_t params, float* cells, float* tmp_cells, int* obstacles, int total_cells)
 {
-    int ii,kk,ri,rj;                 /* generic counters */
     // const float c_sq = 1.0/3.0;  /* square of speed of sound */
     const float w0 = 4.0/9.0;    /* weighting factor */
     const float w[] = {1.0/9.0, 1.0/36.0};    /* weighting factor */
     const int total_num = params.nx * params.ny;
     const float one = 1.0;
     // const float w2 = 1.0/36.0;   /* weighting factor */
-    float u_sq;                  /* squared velocity */
-    float local_density;         /* sum of densities in a particular cell */
-    float t[NSPEEDS];
-    float u[NSPEEDS];            /* directional velocities */
-    float d_equ;        /* equilibrium densities */
+           /* directional velocities */
     float tot_u = 0.0;
-    int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
             /* determine indices of axis-direction neighbours
             ** respecting periodic boundary conditions (wrap around) */
     /* loop over the cells in the grid
     ** NB the collision step is called after
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
+#pragma omp parallel shared(tmp_cells, tot_u)
+    {
+    int ii,kk,ri,rj;                 /* generic counters */
+    int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
+    float u_sq;                  /* squared velocity */
+    float local_density;         /* sum of densities in a particular cell */
+    float t[NSPEEDS];
+    float u[NSPEEDS]; 
+    float d_equ;        /* equilibrium densities */
+#pragma omp for
     for (ii = 0; ii < total_num; ii++) {
         ri = ii/params.nx;
         rj = ii%params.nx;
@@ -232,6 +236,7 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
             tot_u += sqrt(u_sq);  
         }
 
+    }
     }
     return tot_u / (float)total_cells;
 }
