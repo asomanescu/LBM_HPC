@@ -71,11 +71,11 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    speed_t* cells     = NULL;    /* grid containing fluid densities */
-    speed_t* tmp_cells = NULL;    /* scratch space */
+    float* cells     = NULL;    /* grid containing fluid densities */
+    float* tmp_cells = NULL;    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
-
+    int total_cells;
     int    ii;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
     struct rusage ru;             /* structure to hold CPU time--system and user */
@@ -85,17 +85,22 @@ int main(int argc, char* argv[])
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
-    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
-    speed_t2 sp[2];
-    sp[0].spd = cells;
-    sp[1].spd = tmp_cells;
+    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels, &total_cells);
+    float* sp[2];
+    sp[0] = cells;
+    sp[1] = tmp_cells;
     /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+
     for (ii = 0; ii < params.max_iters; ii++)
     {
-        timestep(params, accel_area, sp[ii%2].spd, sp[(ii+1)%2].spd, obstacles);
-        av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
+        accelerate_flow(params,accel_area,sp[(ii)%2],obstacles);
+    // propagate(params,cells,tmp_cells);
+    // rebound(params,cells,tmp_cells,obstacles);
+        av_vels[ii] = collision(params,sp[(ii)%2],sp[(ii+1)%2],obstacles, total_cells);
+        // av_vels[ii] = timestep(params, accel_area, sp[ii%2], sp[(ii+1)%2], obstacles, total_cells);
+        // av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
 
         #ifdef DEBUG
             printf("==timestep: %d==\n", ii);
@@ -125,10 +130,10 @@ int main(int argc, char* argv[])
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels)
+    const param_t params, float* cells, int* obstacles, float* av_vels)
 {
     FILE* fp;                     /* file pointer */
-    int ii,jj,kk;                 /* generic counters */
+    int ii,kk;                 /* generic counters */
     const float c_sq = 1.0/3.0;  /* sq. of speed of sound */
     float local_density;         /* per grid cell sum of densities */
     float pressure;              /* fluid pressure in grid cell */
@@ -143,56 +148,95 @@ void write_values(const char * final_state_file, const char * av_vels_file,
         DIE("could not open file output file");
     }
 
-    for (ii = 0; ii < params.ny; ii++)
-    {
-        for (jj = 0; jj < params.nx; jj++)
-        {
-            /* an occupied cell */
-            if (obstacles[ii*params.nx + jj])
+    for (ii = 0; ii< params.ny * params.nx; ii++) {
+        if (obstacles[ii]) {
+            u_x = u_y = u = 0.0;
+            pressure = params.density * c_sq;
+        } else {
+            local_density = 0.0;
+
+            for (kk = 0; kk < NSPEEDS; kk++)
             {
-                u_x = u_y = u = 0.0;
-                pressure = params.density * c_sq;
-            }
-            /* no obstacle */
-            else
-            {
-                local_density = 0.0;
-
-                for (kk = 0; kk < NSPEEDS; kk++)
-                {
-                    local_density += cells[ii*params.nx + jj].speeds[kk];
-                }
-
-                /* compute x velocity component */
-                u_x = (cells[ii*params.nx + jj].speeds[1] +
-                        cells[ii*params.nx + jj].speeds[5] +
-                        cells[ii*params.nx + jj].speeds[8]
-                    - (cells[ii*params.nx + jj].speeds[3] +
-                        cells[ii*params.nx + jj].speeds[6] +
-                        cells[ii*params.nx + jj].speeds[7]))
-                    / local_density;
-
-                /* compute y velocity component */
-                u_y = (cells[ii*params.nx + jj].speeds[2] +
-                        cells[ii*params.nx + jj].speeds[5] +
-                        cells[ii*params.nx + jj].speeds[6]
-                    - (cells[ii*params.nx + jj].speeds[4] +
-                        cells[ii*params.nx + jj].speeds[7] +
-                        cells[ii*params.nx + jj].speeds[8]))
-                    / local_density;
-
-                /* compute norm of velocity */
-                u = sqrt((u_x * u_x) + (u_y * u_y));
-
-                /* compute pressure */
-                pressure = local_density * c_sq;
+                local_density += cells[kk*params.nx*params.ny+ii];
             }
 
-            /* write to file */
-            fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %d\n",
-                jj,ii,u_x,u_y,u,pressure,obstacles[ii*params.nx + jj]);
+            /* compute x velocity component */
+            u_x = (cells[1*params.nx*params.ny+ii] +
+                    cells[5*params.nx*params.ny+ii] +
+                    cells[8*params.nx*params.ny+ii]
+                - (cells[3*params.nx*params.ny+ii] +
+                    cells[6*params.nx*params.ny+ii] +
+                    cells[7*params.nx*params.ny+ii]))
+                / local_density;
+
+            /* compute y velocity component */
+            u_y = (cells[2*params.nx*params.ny+ii] +
+                    cells[5*params.nx*params.ny+ii] +
+                    cells[6*params.nx*params.ny+ii]
+                - (cells[4*params.nx*params.ny+ii] +
+                    cells[7*params.nx*params.ny+ii] +
+                    cells[8*params.nx*params.ny+ii]))
+                / local_density;
+
+            /* compute norm of velocity */
+            u = sqrt((u_x * u_x) + (u_y * u_y));
+
+            /* compute pressure */
+            pressure = local_density * c_sq;
         }
+        fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %d\n",
+            ii%params.nx,ii/params.nx,u_x,u_y,u,pressure,obstacles[ii]);
     }
+    // for (ii = 0; ii < params.ny; ii++)
+    // {
+    //     for (jj = 0; jj < params.nx; jj++)
+    //     {
+    //         /* an occupied cell */
+    //         if (obstacles[ii*params.nx + jj])
+    //         {
+    //             u_x = u_y = u = 0.0;
+    //             pressure = params.density * c_sq;
+    //         }
+    //         /* no obstacle */
+    //         else
+    //         {
+    //             local_density = 0.0;
+
+    //             for (kk = 0; kk < NSPEEDS; kk++)
+    //             {
+    //                 local_density += cells[ii*params.nx + jj].speeds[kk];
+    //             }
+
+    //             /* compute x velocity component */
+    //             u_x = (cells[ii*params.nx + jj].speeds[1] +
+    //                     cells[ii*params.nx + jj].speeds[5] +
+    //                     cells[ii*params.nx + jj].speeds[8]
+    //                 - (cells[ii*params.nx + jj].speeds[3] +
+    //                     cells[ii*params.nx + jj].speeds[6] +
+    //                     cells[ii*params.nx + jj].speeds[7]))
+    //                 / local_density;
+
+    //             /* compute y velocity component */
+    //             u_y = (cells[ii*params.nx + jj].speeds[2] +
+    //                     cells[ii*params.nx + jj].speeds[5] +
+    //                     cells[ii*params.nx + jj].speeds[6]
+    //                 - (cells[ii*params.nx + jj].speeds[4] +
+    //                     cells[ii*params.nx + jj].speeds[7] +
+    //                     cells[ii*params.nx + jj].speeds[8]))
+    //                 / local_density;
+
+    //             /* compute norm of velocity */
+    //             u = sqrt((u_x * u_x) + (u_y * u_y));
+
+    //             /* compute pressure */
+    //             pressure = local_density * c_sq;
+    //         }
+
+    //         /* write to file */
+    //         fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %d\n",
+    //             jj,ii,u_x,u_y,u,pressure,obstacles[ii*params.nx + jj]);
+    //     }
+    // }
 
     fclose(fp);
 
@@ -210,7 +254,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
     fclose(fp);
 }
 
-float calc_reynolds(const param_t params, speed_t* cells, int* obstacles)
+float calc_reynolds(const param_t params, float* cells, int* obstacles)
 {
     const float viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
 
