@@ -47,13 +47,13 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* paramfile, accel_area_t * accel_area,
     param_t* params, float** cells_ptr, float** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr, int* total_cells);
+    unsigned** obstacles_ptr, float** av_vels_ptr, unsigned* total_cells);
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, float* cells, int* obstacles, float* av_vels);
+    const param_t params, float* cells, unsigned* obstacles, float* av_vels);
 
 void finalise(float** cells_ptr, float** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr);
+    unsigned** obstacles_ptr, float** av_vels_ptr);
 
 float timestep(const param_t params, const accel_area_t accel_area,
     float* cells, float* tmp_cells, int* obstacles, int total_cells);
@@ -68,10 +68,10 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
 float total_density(const param_t params, speed_t* cells);
 
 /* compute average velocity */
-float av_velocity(const param_t params, float* cells, int* obstacles);
+float av_velocity(const param_t params, float* cells, unsigned* obstacles);
 
 /* calculate Reynolds number */
-float calc_reynolds(const param_t params, float* cells, int* obstacles);
+float calc_reynolds(const param_t params, float* cells, unsigned* obstacles);
 
 /* Exit, printing out formatted string */
 #define DIE(...) exit_with_error(__LINE__, __FILE__, __VA_ARGS__)

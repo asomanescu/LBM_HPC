@@ -96,7 +96,7 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* param_file, accel_area_t * accel_area,
     param_t* params, float** cells_ptr, float** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr, int *total_cells)
+    unsigned** obstacles_ptr, float** av_vels_ptr, unsigned *total_cells)
 {
     FILE   *fp;            /* file pointer */
     int    ii,jj, kk;          /* generic counters */
@@ -185,7 +185,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     *tmp_cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*9));
     if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
 
-    *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
+    *obstacles_ptr = (unsigned*) malloc(sizeof(int)*(params->ny*params->nx));
     if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
 
     *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters));
@@ -254,7 +254,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
 }
 
 void finalise(float** cells_ptr, float** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr)
+    unsigned** obstacles_ptr, float** av_vels_ptr)
 {
     /* Free allocated memory */
     free(*cells_ptr);

@@ -74,11 +74,11 @@ int main(int argc, char* argv[])
     param_t  params;              /* struct to hold parameter values */
     //float* cells     = NULL;    /* grid containing fluid densities */
     //float* tmp_cells = NULL;    /* scratch space */
-    int*     obstacles = NULL;    /* grid indicating which cells are blocked */
+    unsigned*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
     float* sp[2];
-    int total_cells;
-    int    i;                    /*  generic counter */
+    unsigned total_cells;
+    unsigned    i;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
     struct rusage ru;             /* structure to hold CPU time--system and user */
     double tic,toc;               /* doubleing point numbers to calculate elapsed wallclock time */
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
     // sp[1] = tmp_cells;
     const float w0 = 4.0/9.0;    /* weighting factor */
     const float w[] = {1.0/9.0, 1.0/36.0};    /* weighting factor */
-    const int total_num = params.nx * params.ny;
+    const unsigned total_num = params.nx * params.ny;
     const float one = 1.0;
     float w1,w2;  /* weighting factors */
     // const float w2 = 1.0/36.0;   /* weighting factor */
@@ -104,8 +104,8 @@ int main(int argc, char* argv[])
     ** NB the collision step is called after
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
-    int ii,kk,jj,ri,rj;                 /* generic counters */
-    int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
+    unsigned ii,kk,jj,ri,rj;                 /* generic counters */
+    unsigned x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
     // int cell, tmp;
     float u_sq;                  /* squared velocity */
     float local_density;         /* sum of densities in a particular cell */
@@ -119,8 +119,8 @@ int main(int argc, char* argv[])
 
     for (i = 0; i < params.max_iters; i++)
     {
-        int const cell = i%2;
-        int const temp = (i+1)%2;
+        short const cell = i%2;
+        short const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
         w1 = params.density * params.accel * w[0];
@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
 #pragma omp parallel for schedule(guided)
             for (ii = 0; ii < params.ny; ii++)
             {
-                int const res = ii*params.nx + jj;
+                unsigned const res = ii*params.nx + jj;
                 /* if the cell is not occupied and
                 ** we don't send a density negative */
                 if (!obstacles[res] &&
@@ -256,9 +256,8 @@ int main(int argc, char* argv[])
             *(*(sp + temp) + ii) = (*t + params.omega * (d_equ - *t));
             for (kk = 1; kk < NSPEEDS; kk++)
             {
-                d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))/ 1.0
-                    +(9.0**(u + kk)**(u + kk)) / 2.0
-                    - (3.0* u_sq )/ 2.0);
+                d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
+                    +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
                 *(*(sp + temp) + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
             }
             tot_u = tot_u + sqrt(u_sq);  
@@ -297,7 +296,7 @@ int main(int argc, char* argv[])
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, float* cells, int* obstacles, float* av_vels)
+    const param_t params, float* cells, unsigned* obstacles, float* av_vels)
 {
     FILE* fp;                     /* file pointer */
     int ii,kk;                 /* generic counters */
@@ -351,7 +350,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
             /* compute pressure */
             pressure = local_density * c_sq;
         }
-        fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %d\n",
+        fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %u\n",
             ii%params.nx,ii/params.nx,u_x,u_y,u,pressure,obstacles[ii]);
     }
     // for (ii = 0; ii < params.ny; ii++)
@@ -421,7 +420,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
     fclose(fp);
 }
 
-float calc_reynolds(const param_t params, float* cells, int* obstacles)
+float calc_reynolds(const param_t params, float* cells, unsigned* obstacles)
 {
     const float viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
 

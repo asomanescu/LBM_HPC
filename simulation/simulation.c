@@ -242,7 +242,7 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
     return tot_u / (float)total_cells;
 }
 
-float av_velocity(const param_t params, float* cells, int* obstacles)
+float av_velocity(const param_t params, float* cells, unsigned* obstacles)
 {
     int    ii,kk;       /* generic counters */
     int    tot_cells = 0;  /* no. of cells used in calculation */
