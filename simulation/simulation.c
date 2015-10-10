@@ -150,17 +150,18 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
     ** NB the collision step is called after
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
-#pragma omp parallel shared(tmp_cells, tot_u)
+#pragma omp parallel 
     {
-    int ii,kk,ri,rj;                 /* generic counters */
-    int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
-    float u_sq;                  /* squared velocity */
-    float local_density;         /* sum of densities in a particular cell */
-    float t[NSPEEDS];
-    float u[NSPEEDS]; 
-    float d_equ;        /* equilibrium densities */
-#pragma omp for
+        int ii,kk,ri,rj;                 /* generic counters */
+        int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
+        float u_sq;                  /* squared velocity */
+        float local_density;         /* sum of densities in a particular cell */
+        float t[NSPEEDS];
+        float u[NSPEEDS]; 
+        float d_equ;        /* equilibrium densities */
+#pragma omp for reduction(+:tot_u) schedule(guided)
     for (ii = 0; ii < total_num; ii++) {
+        // printf("%d .... %d \n", omp_get_thread_num(), ii);
         ri = ii/params.nx;
         rj = ii%params.nx;
         y_n = ri + 1;
@@ -177,31 +178,31 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
         } else if ( rj == params.nx - 1) {
             x_e = 0;
         }
-        t[0] = cells[ii];
-        t[1] = cells[total_num   + ri*params.nx + x_w];
-        t[2] = cells[total_num*2 + y_s*params.nx + rj];
-        t[3] = cells[total_num*3 + ri*params.nx + x_e];
-        t[4] = cells[total_num*4 + y_n*params.nx + rj];
-        t[5] = cells[total_num*5 + y_s*params.nx + x_w];
-        t[6] = cells[total_num*6 + y_s*params.nx + x_e];
-        t[7] = cells[total_num*7 + y_n*params.nx + x_e];
-        t[8] = cells[total_num*8 + y_n*params.nx + x_w];
+        *(t + 0) = *(cells + ii);
+        *(t + 1) = *(cells + total_num   + ri*params.nx  + x_w);
+        *(t + 2) = *(cells + total_num*2 + y_s*params.nx + rj);
+        *(t + 3) = *(cells + total_num*3 + ri*params.nx  + x_e);
+        *(t + 4) = *(cells + total_num*4 + y_n*params.nx + rj);
+        *(t + 5) = *(cells + total_num*5 + y_s*params.nx + x_w);
+        *(t + 6) = *(cells + total_num*6 + y_s*params.nx + x_e);
+        *(t + 7) = *(cells + total_num*7 + y_n*params.nx + x_e);
+        *(t + 8) = *(cells + total_num*8 + y_n*params.nx + x_w);
         if (obstacles[ii]) {
-            tmp_cells[1*total_num + ii] = t[3];
-            tmp_cells[2*total_num + ii] = t[4];
-            tmp_cells[3*total_num + ii] = t[1];
-            tmp_cells[4*total_num + ii] = t[2];
-            tmp_cells[5*total_num + ii] = t[7];
-            tmp_cells[6*total_num + ii] = t[8];
-            tmp_cells[7*total_num + ii] = t[5];
-            tmp_cells[8*total_num + ii] = t[6];
+            *(tmp_cells + 1*total_num + ii) = *(t + 3);
+            *(tmp_cells + 2*total_num + ii) = *(t + 4);
+            *(tmp_cells + 3*total_num + ii) = *(t + 1);
+            *(tmp_cells + 4*total_num + ii) = *(t + 2);
+            *(tmp_cells + 5*total_num + ii) = *(t + 7);
+            *(tmp_cells + 6*total_num + ii) = *(t + 8);
+            *(tmp_cells + 7*total_num + ii) = *(t + 5);
+            *(tmp_cells + 8*total_num + ii) = *(t + 6);
         } else {
             
             local_density = 0.0;
 
             for (kk = 0; kk < NSPEEDS; kk++)
             {
-                local_density += t[kk];
+                local_density += *(t + kk);
             }
 
             /* compute x velocity component */
@@ -231,13 +232,12 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
                 d_equ = w[(kk-1)/4] * local_density * (one + (3.0*u[kk])/ 1.0
                     +(9.0*u[kk]*u[kk]) / 2.0
                     - (3.0* u_sq )/ 2.0);
-                tmp_cells[kk*total_num + ii] = (t[kk] + params.omega * (d_equ - t[kk]));
+                *(tmp_cells + kk*total_num + ii) = (t[kk] + params.omega * (d_equ - t[kk]));
             }
             tot_u += sqrt(u_sq);  
         }
 
-    }
-    }
+    }}
     return tot_u / (float)total_cells;
 }
 
