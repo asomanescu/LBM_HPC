@@ -72,10 +72,11 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    float* cells     = NULL;    /* grid containing fluid densities */
-    float* tmp_cells = NULL;    /* scratch space */
+    //float* cells     = NULL;    /* grid containing fluid densities */
+    //float* tmp_cells = NULL;    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
+    float* sp[2];
     int total_cells;
     int    i;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
@@ -86,10 +87,9 @@ int main(int argc, char* argv[])
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
-    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels, &total_cells);
-    float* sp[2];
-    sp[0] = cells;
-    sp[1] = tmp_cells;
+    initialise(param_file, &accel_area, &params, &sp[0], &sp[1], &obstacles, &av_vels, &total_cells);
+    // sp[0] = cells;
+    // sp[1] = tmp_cells;
     const float w0 = 4.0/9.0;    /* weighting factor */
     const float w[] = {1.0/9.0, 1.0/36.0};    /* weighting factor */
     const int total_num = params.nx * params.ny;
@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
     int ii,kk,jj,ri,rj;                 /* generic counters */
+    // int cell, tmp;
     float u_sq;                  /* squared velocity */
     float local_density;         /* sum of densities in a particular cell */
     float t[NSPEEDS];
@@ -117,7 +118,8 @@ int main(int argc, char* argv[])
 
     for (i = 0; i < params.max_iters; i++)
     {
-
+        int const cell = i%2;
+        int const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
         w1 = params.density * params.accel / 9.0;
@@ -125,26 +127,28 @@ int main(int argc, char* argv[])
 
         if (accel_area.col_or_row == ACCEL_COLUMN)
         {
-            // jj = accel_area.idx;
-            // for (ii = 0; ii < params.ny; ii++)
-            // {
-            //     /* if the cell is not occupied and
-            //     ** we don't send a density negative */
-            //     if (!obstacles[ii*params.nx + jj] &&
-            //     (cells[ii*params.nx + jj].speeds[4] - w1) > 0.0 &&
-            //     (cells[ii*params.nx + jj].speeds[7] - w2) > 0.0 &&
-            //     (cells[ii*params.nx + jj].speeds[8] - w2) > 0.0 )
-            //     {
-            //          // increase 'north-side' densities 
-            //         cells[ii*params.nx + jj].speeds[2] += w1;
-            //         cells[ii*params.nx + jj].speeds[5] += w2;
-            //         cells[ii*params.nx + jj].speeds[6] += w2;
-            //         /* decrease 'south-side' densities */
-            //         cells[ii*params.nx + jj].speeds[4] -= w1;
-            //         cells[ii*params.nx + jj].speeds[7] -= w2;
-            //         cells[ii*params.nx + jj].speeds[8] -= w2;
-            //     }
-            // }
+            jj = accel_area.idx;
+#pragma omp parallel for schedule(guided)
+            for (ii = 0; ii < params.ny; ii++)
+            {
+                int const res = ii*params.nx + jj;
+                /* if the cell is not occupied and
+                ** we don't send a density negative */
+                if (!obstacles[res] &&
+                (*(sp[cell] + 4*total_num + res) - w1) > 0.0 &&
+                (*(sp[cell] + 7*total_num + res) - w2) > 0.0 &&
+                (*(sp[cell] + 8*total_num + res) - w2) > 0.0 )
+                {
+                     // increase 'north-side' densities 
+                    *(sp[cell] + 2*total_num + res) += w1;
+                    *(sp[cell] + 5*total_num + res) += w2;
+                    *(sp[cell] + 6*total_num + res) += w2;
+                    /* decrease 'south-side' densities */
+                    *(sp[cell] + 4*total_num + res) -= w1;
+                    *(sp[cell] + 7*total_num + res) -= w2;
+                    *(sp[cell] + 8*total_num + res) -= w2;
+                }
+            }
         }
         else
         {
@@ -156,18 +160,18 @@ int main(int argc, char* argv[])
                 /* if the cell is not occupied and
                 ** we don't send a density negative */
                 if (!obstacles[jj] &&
-                (*(sp[i%2] + 3*total_num + jj) - w1) > 0.0 &&
-                (*(sp[i%2] + 6*total_num + jj) - w2) > 0.0 &&
-                (*(sp[i%2] + 7*total_num + jj) - w2) > 0.0 )
+                (*(sp[cell] + 3*total_num + jj) - w1) > 0.0 &&
+                (*(sp[cell] + 6*total_num + jj) - w2) > 0.0 &&
+                (*(sp[cell] + 7*total_num + jj) - w2) > 0.0 )
                 {
                     /* increase 'east-side' densities */
-                    *(sp[i%2] + 1*total_num + jj) += w1;
-                    *(sp[i%2] + 5*total_num + jj) += w2;
-                    *(sp[i%2] + 8*total_num + jj) += w2;
+                    *(sp[cell] + 1*total_num + jj) += w1;
+                    *(sp[cell] + 5*total_num + jj) += w2;
+                    *(sp[cell] + 8*total_num + jj) += w2;
                     /* decrease 'west-side' densities */
-                    *(sp[i%2] + 3*total_num + jj) -= w1;
-                    *(sp[i%2] + 6*total_num + jj) -= w2;
-                    *(sp[i%2] + 7*total_num + jj) -= w2;
+                    *(sp[cell] + 3*total_num + jj) -= w1;
+                    *(sp[cell] + 6*total_num + jj) -= w2;
+                    *(sp[cell] + 7*total_num + jj) -= w2;
                 }
             }
         }
@@ -175,7 +179,7 @@ int main(int argc, char* argv[])
 #pragma omp parallel private(ii, kk, ri, rj, u_sq, local_density, t , u, d_equ)
     {
 
-#pragma omp for reduction(+:tot_u) schedule(guided)
+#pragma omp for reduction(+:tot_u) schedule(guided) nowait
     for (ii = 0; ii < total_num; ii++) {
         int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
         // printf("%d .... %d \n", omp_get_thread_num(), ii);
@@ -195,24 +199,24 @@ int main(int argc, char* argv[])
         } else if ( rj == params.nx - 1) {
             x_e = 0;
         }
-        *(t + 0) = *(sp[i%2] + ii);
-        *(t + 1) = *(sp[i%2] + total_num   + ri*params.nx  + x_w);
-        *(t + 2) = *(sp[i%2] + total_num*2 + y_s*params.nx + rj);
-        *(t + 3) = *(sp[i%2] + total_num*3 + ri*params.nx  + x_e);
-        *(t + 4) = *(sp[i%2] + total_num*4 + y_n*params.nx + rj);
-        *(t + 5) = *(sp[i%2] + total_num*5 + y_s*params.nx + x_w);
-        *(t + 6) = *(sp[i%2] + total_num*6 + y_s*params.nx + x_e);
-        *(t + 7) = *(sp[i%2] + total_num*7 + y_n*params.nx + x_e);
-        *(t + 8) = *(sp[i%2] + total_num*8 + y_n*params.nx + x_w);
+        *(t + 0) = *(sp[cell] + ii);
+        *(t + 1) = *(sp[cell] + total_num   + ri*params.nx  + x_w);
+        *(t + 2) = *(sp[cell] + total_num*2 + y_s*params.nx + rj);
+        *(t + 3) = *(sp[cell] + total_num*3 + ri*params.nx  + x_e);
+        *(t + 4) = *(sp[cell] + total_num*4 + y_n*params.nx + rj);
+        *(t + 5) = *(sp[cell] + total_num*5 + y_s*params.nx + x_w);
+        *(t + 6) = *(sp[cell] + total_num*6 + y_s*params.nx + x_e);
+        *(t + 7) = *(sp[cell] + total_num*7 + y_n*params.nx + x_e);
+        *(t + 8) = *(sp[cell] + total_num*8 + y_n*params.nx + x_w);
         if (obstacles[ii]) {
-            *(sp[(i+1)%2] + 1*total_num + ii) = *(t + 3);
-            *(sp[(i+1)%2] + 2*total_num + ii) = *(t + 4);
-            *(sp[(i+1)%2] + 3*total_num + ii) = *(t + 1);
-            *(sp[(i+1)%2] + 4*total_num + ii) = *(t + 2);
-            *(sp[(i+1)%2] + 5*total_num + ii) = *(t + 7);
-            *(sp[(i+1)%2] + 6*total_num + ii) = *(t + 8);
-            *(sp[(i+1)%2] + 7*total_num + ii) = *(t + 5);
-            *(sp[(i+1)%2] + 8*total_num + ii) = *(t + 6);
+            *(sp[temp] + 1*total_num + ii) = *(t + 3);
+            *(sp[temp] + 2*total_num + ii) = *(t + 4);
+            *(sp[temp] + 3*total_num + ii) = *(t + 1);
+            *(sp[temp] + 4*total_num + ii) = *(t + 2);
+            *(sp[temp] + 5*total_num + ii) = *(t + 7);
+            *(sp[temp] + 6*total_num + ii) = *(t + 8);
+            *(sp[temp] + 7*total_num + ii) = *(t + 5);
+            *(sp[temp] + 8*total_num + ii) = *(t + 6);
         } else {
             
             local_density = 0.0;
@@ -243,13 +247,13 @@ int main(int argc, char* argv[])
 
             d_equ = w0 * local_density * (one - (3.0*u_sq) / 2.0);
             /* relaxation step */
-            *(sp[(i+1)%2] + ii) = (t[0] + params.omega * (d_equ - t[0]));
+            *(sp[temp] + ii) = (t[0] + params.omega * (d_equ - t[0]));
             for (kk = 1; kk < NSPEEDS; kk++)
             {
                 d_equ = w[(kk-1)/4] * local_density * (one + (3.0*u[kk])/ 1.0
                     +(9.0*u[kk]*u[kk]) / 2.0
                     - (3.0* u_sq )/ 2.0);
-                *(sp[(i+1)%2] + kk*total_num + ii) = (t[kk] + params.omega * (d_equ - t[kk]));
+                *(sp[temp] + kk*total_num + ii) = (t[kk] + params.omega * (d_equ - t[kk]));
             }
             tot_u = tot_u + sqrt(u_sq);  
         }
@@ -261,7 +265,7 @@ int main(int argc, char* argv[])
     // propagate(params,cells,tmp_cells);
     // rebound(params,cells,tmp_cells,obstacles);
         // av_vels[i] = collision(params,sp[(i)%2],sp[(i+1)%2],obstacles, total_cells);
-        // av_vels[ii] = timestep(params, accel_area, sp[ii%2], sp[(ii+1)%2], obstacles, total_cells);
+        // av_vels[ii] = timestep(params, accel_area, sp[icell], sp[(ii+1)%2], obstacles, total_cells);
         // av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
 
         #ifdef DEBUG
@@ -280,13 +284,13 @@ int main(int argc, char* argv[])
     systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
     printf("==done==\n");
-    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,cells,obstacles));
+    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,sp[i%2],obstacles));
     printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-    write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels);
-    finalise(&cells, &tmp_cells, &obstacles, &av_vels);
+    write_values(final_state_file, av_vels_file, params, sp[i%2], obstacles, av_vels);
+    finalise(&sp[i%2], &sp[(i+1)%2], &obstacles, &av_vels);
 
     return EXIT_SUCCESS;
 }
