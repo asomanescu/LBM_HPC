@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
     int ii,kk,jj,ri,rj;                 /* generic counters */
+    int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
     // int cell, tmp;
     float u_sq;                  /* squared velocity */
     float local_density;         /* sum of densities in a particular cell */
@@ -122,8 +123,8 @@ int main(int argc, char* argv[])
         int const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
-        w1 = params.density * params.accel / 9.0;
-        w2 = params.density * params.accel / 36.0;
+        w1 = params.density * params.accel * w[0];
+        w2 = params.density * params.accel * w[1];
 
         if (accel_area.col_or_row == ACCEL_COLUMN)
         {
@@ -135,18 +136,18 @@ int main(int argc, char* argv[])
                 /* if the cell is not occupied and
                 ** we don't send a density negative */
                 if (!obstacles[res] &&
-                (*(sp[cell] + 4*total_num + res) - w1) > 0.0 &&
-                (*(sp[cell] + 7*total_num + res) - w2) > 0.0 &&
-                (*(sp[cell] + 8*total_num + res) - w2) > 0.0 )
+                (*(*(sp + cell) + 4*total_num + res) - w1) > 0.0 &&
+                (*(*(sp + cell) + 7*total_num + res) - w2) > 0.0 &&
+                (*(*(sp + cell) + 8*total_num + res) - w2) > 0.0 )
                 {
                      // increase 'north-side' densities 
-                    *(sp[cell] + 2*total_num + res) += w1;
-                    *(sp[cell] + 5*total_num + res) += w2;
-                    *(sp[cell] + 6*total_num + res) += w2;
+                    *(*(sp + cell) + 2*total_num + res) += w1;
+                    *(*(sp + cell) + 5*total_num + res) += w2;
+                    *(*(sp + cell) + 6*total_num + res) += w2;
                     /* decrease 'south-side' densities */
-                    *(sp[cell] + 4*total_num + res) -= w1;
-                    *(sp[cell] + 7*total_num + res) -= w2;
-                    *(sp[cell] + 8*total_num + res) -= w2;
+                    *(*(sp + cell) + 4*total_num + res) -= w1;
+                    *(*(sp + cell) + 7*total_num + res) -= w2;
+                    *(*(sp + cell) + 8*total_num + res) -= w2;
                 }
             }
         }
@@ -160,63 +161,68 @@ int main(int argc, char* argv[])
                 /* if the cell is not occupied and
                 ** we don't send a density negative */
                 if (!obstacles[jj] &&
-                (*(sp[cell] + 3*total_num + jj) - w1) > 0.0 &&
-                (*(sp[cell] + 6*total_num + jj) - w2) > 0.0 &&
-                (*(sp[cell] + 7*total_num + jj) - w2) > 0.0 )
+                (*(*(sp + cell) + 3*total_num + jj) - w1) > 0.0 &&
+                (*(*(sp + cell) + 6*total_num + jj) - w2) > 0.0 &&
+                (*(*(sp + cell) + 7*total_num + jj) - w2) > 0.0 )
                 {
                     /* increase 'east-side' densities */
-                    *(sp[cell] + 1*total_num + jj) += w1;
-                    *(sp[cell] + 5*total_num + jj) += w2;
-                    *(sp[cell] + 8*total_num + jj) += w2;
+                    *(*(sp + cell) + 1*total_num + jj) += w1;
+                    *(*(sp + cell) + 5*total_num + jj) += w2;
+                    *(*(sp + cell) + 8*total_num + jj) += w2;
                     /* decrease 'west-side' densities */
-                    *(sp[cell] + 3*total_num + jj) -= w1;
-                    *(sp[cell] + 6*total_num + jj) -= w2;
-                    *(sp[cell] + 7*total_num + jj) -= w2;
+                    *(*(sp + cell) + 3*total_num + jj) -= w1;
+                    *(*(sp + cell) + 6*total_num + jj) -= w2;
+                    *(*(sp + cell) + 7*total_num + jj) -= w2;
                 }
             }
         }
 
-#pragma omp parallel private(ii, kk, ri, rj, u_sq, local_density, t , u, d_equ)
+#pragma omp parallel private(ii, kk, ri, rj, u_sq, local_density, t , u, d_equ, x_e,x_w,y_n,y_s)
     {
 
 #pragma omp for reduction(+:tot_u) schedule(guided) nowait
     for (ii = 0; ii < total_num; ii++) {
-        int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
         // printf("%d .... %d \n", omp_get_thread_num(), ii);
         ri = ii/params.nx;
         rj = ii%params.nx;
-        y_n = ri + 1;
-        x_e = rj + 1;
-        y_s = ri - 1;
-        x_w = rj - 1;
         if (ri == 0) {
-            y_s += params.ny;
+            y_s = ri + params.ny - 1;
+            y_n = ri + 1;
         } else if (ri == params.ny - 1) {
             y_n = 0;
+            y_s = ri - 1;
+        } else {
+            y_n = ri + 1;
+            y_s = ri - 1;
         }
         if (rj == 0 ) {
-            x_w += params.nx;
+            x_w = rj + params.nx - 1;
+            x_e = rj + 1;
         } else if ( rj == params.nx - 1) {
             x_e = 0;
+            x_w = rj - 1;
+        } else {
+            x_e = rj + 1;
+            x_w = rj - 1;
         }
-        *(t + 0) = *(sp[cell] + ii);
-        *(t + 1) = *(sp[cell] + total_num   + ri*params.nx  + x_w);
-        *(t + 2) = *(sp[cell] + total_num*2 + y_s*params.nx + rj);
-        *(t + 3) = *(sp[cell] + total_num*3 + ri*params.nx  + x_e);
-        *(t + 4) = *(sp[cell] + total_num*4 + y_n*params.nx + rj);
-        *(t + 5) = *(sp[cell] + total_num*5 + y_s*params.nx + x_w);
-        *(t + 6) = *(sp[cell] + total_num*6 + y_s*params.nx + x_e);
-        *(t + 7) = *(sp[cell] + total_num*7 + y_n*params.nx + x_e);
-        *(t + 8) = *(sp[cell] + total_num*8 + y_n*params.nx + x_w);
+        *t = *(*(sp + cell) + ii);
+        *(t + 1) = *(*(sp + cell) + total_num   + ri*params.nx  + x_w);
+        *(t + 2) = *(*(sp + cell) + total_num*2 + y_s*params.nx + rj);
+        *(t + 3) = *(*(sp + cell) + total_num*3 + ri*params.nx  + x_e);
+        *(t + 4) = *(*(sp + cell) + total_num*4 + y_n*params.nx + rj);
+        *(t + 5) = *(*(sp + cell) + total_num*5 + y_s*params.nx + x_w);
+        *(t + 6) = *(*(sp + cell) + total_num*6 + y_s*params.nx + x_e);
+        *(t + 7) = *(*(sp + cell) + total_num*7 + y_n*params.nx + x_e);
+        *(t + 8) = *(*(sp + cell) + total_num*8 + y_n*params.nx + x_w);
         if (obstacles[ii]) {
-            *(sp[temp] + 1*total_num + ii) = *(t + 3);
-            *(sp[temp] + 2*total_num + ii) = *(t + 4);
-            *(sp[temp] + 3*total_num + ii) = *(t + 1);
-            *(sp[temp] + 4*total_num + ii) = *(t + 2);
-            *(sp[temp] + 5*total_num + ii) = *(t + 7);
-            *(sp[temp] + 6*total_num + ii) = *(t + 8);
-            *(sp[temp] + 7*total_num + ii) = *(t + 5);
-            *(sp[temp] + 8*total_num + ii) = *(t + 6);
+            *(*(sp + temp) + 1*total_num + ii) = *(t + 3);
+            *(*(sp + temp) + 2*total_num + ii) = *(t + 4);
+            *(*(sp + temp) + 3*total_num + ii) = *(t + 1);
+            *(*(sp + temp) + 4*total_num + ii) = *(t + 2);
+            *(*(sp + temp) + 5*total_num + ii) = *(t + 7);
+            *(*(sp + temp) + 6*total_num + ii) = *(t + 8);
+            *(*(sp + temp) + 7*total_num + ii) = *(t + 5);
+            *(*(sp + temp) + 8*total_num + ii) = *(t + 6);
         } else {
             
             local_density = 0.0;
@@ -227,33 +233,33 @@ int main(int argc, char* argv[])
             }
 
             /* compute x velocity component */
-            u[1] = (t[1] + t[5] + t[8] - (t[3] + t[6] + t[7])) / local_density;
+            *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7))) / local_density;
 
             /* compute y velocity component */
-            u[2] = (t[2] + t[5] + t[6] - (t[4] + t[7] + t[8])) / local_density;
+            *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8))) / local_density;
 
             /* velocity squared */
-            u_sq = u[1] * u[1] + u[2] * u[2];
+            u_sq = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
 
             /* directional velocity components */
-            // u[1] =   u_x;        /* east */
-            // u[2] =         u_y;  /* north */
-            u[3] = - u[1];        /* west */
-            u[4] =        - u[2];  /* south */
-            u[5] =   u[1] + u[2];  /* north-east */
-            u[6] = - u[1] + u[2];  /* north-west */
-            u[7] = - u[1] - u[2];  /* south-west */
-            u[8] =   u[1] - u[2];  /* south-east */
+            // *(u + 1) =   u_x;        /* east */
+            // *(u + 2) =         u_y;  /* north */
+            *(u + 3) = - *(u + 1);        /* west */
+            *(u + 4) =        - *(u + 2);  /* south */
+            *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
+            *(u + 6) = - *(u + 1) + *(u + 2);  /* north-west */
+            *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
+            *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
 
             d_equ = w0 * local_density * (one - (3.0*u_sq) / 2.0);
             /* relaxation step */
-            *(sp[temp] + ii) = (t[0] + params.omega * (d_equ - t[0]));
+            *(*(sp + temp) + ii) = (*t + params.omega * (d_equ - *t));
             for (kk = 1; kk < NSPEEDS; kk++)
             {
-                d_equ = w[(kk-1)/4] * local_density * (one + (3.0*u[kk])/ 1.0
-                    +(9.0*u[kk]*u[kk]) / 2.0
+                d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))/ 1.0
+                    +(9.0**(u + kk)**(u + kk)) / 2.0
                     - (3.0* u_sq )/ 2.0);
-                *(sp[temp] + kk*total_num + ii) = (t[kk] + params.omega * (d_equ - t[kk]));
+                *(*(sp + temp) + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
             }
             tot_u = tot_u + sqrt(u_sq);  
         }
@@ -268,11 +274,6 @@ int main(int argc, char* argv[])
         // av_vels[ii] = timestep(params, accel_area, sp[icell], sp[(ii+1)%2], obstacles, total_cells);
         // av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
 
-        #ifdef DEBUG
-            printf("==timestep: %d==\n", ii);
-            printf("av velocity: %.12E\n", av_vels[ii]);
-            printf("tot density: %.12E\n", total_density(params, cells));
-        #endif
     }
 
     gettimeofday(&timstr,NULL);
