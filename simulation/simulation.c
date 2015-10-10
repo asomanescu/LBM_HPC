@@ -150,17 +150,18 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
     ** NB the collision step is called after
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
-#pragma omp parallel 
+    int ii,kk,ri,rj;                 /* generic counters */
+    float u_sq;                  /* squared velocity */
+    float local_density;         /* sum of densities in a particular cell */
+    float t[NSPEEDS];
+    float u[NSPEEDS]; 
+    float d_equ;        /* equilibrium densities */
+#pragma omp parallel private(ii, kk, ri, rj, u_sq, local_density, t , u, d_equ)
     {
-        int ii,kk,ri,rj;                 /* generic counters */
-        int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
-        float u_sq;                  /* squared velocity */
-        float local_density;         /* sum of densities in a particular cell */
-        float t[NSPEEDS];
-        float u[NSPEEDS]; 
-        float d_equ;        /* equilibrium densities */
+
 #pragma omp for reduction(+:tot_u) schedule(guided)
     for (ii = 0; ii < total_num; ii++) {
+        int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
         // printf("%d .... %d \n", omp_get_thread_num(), ii);
         ri = ii/params.nx;
         rj = ii%params.nx;
