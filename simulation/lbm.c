@@ -79,9 +79,9 @@ int main(int argc, char* argv[])
     int    ii;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
     struct rusage ru;             /* structure to hold CPU time--system and user */
-    float tic,toc;               /* floating point numbers to calculate elapsed wallclock time */
-    float usrtim;                /* floating point number to record elapsed user CPU time */
-    float systim;                /* floating point number to record elapsed system CPU time */
+    double tic,toc;               /* doubleing point numbers to calculate elapsed wallclock time */
+    double usrtim;                /* doubleing point number to record elapsed user CPU time */
+    double systim;                /* doubleing point number to record elapsed system CPU time */
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
