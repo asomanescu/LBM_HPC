@@ -75,6 +75,7 @@ int main(int argc, char* argv[])
     speed_t* tmp_cells = NULL;    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
+    int total_cells;
 
     int    ii;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
@@ -85,7 +86,7 @@ int main(int argc, char* argv[])
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
-    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
+    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels, &total_cells);
     speed_t2 sp[2];
     sp[0].spd = cells;
     sp[1].spd = tmp_cells;
@@ -94,14 +95,61 @@ int main(int argc, char* argv[])
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
     for (ii = 0; ii < params.max_iters; ii++)
     {
-        timestep(params, accel_area, sp[ii%2].spd, sp[(ii+1)%2].spd, obstacles);
-        av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
+        int i,jj;     /* generic counters */
+        float w1,w2;  /* weighting factors */
 
-        #ifdef DEBUG
-            printf("==timestep: %d==\n", ii);
-            printf("av velocity: %.12E\n", av_vels[ii]);
-            printf("tot density: %.12E\n", total_density(params, cells));
-        #endif
+        /* compute weighting factors */
+        w1 = params.density * params.accel / 9.0;
+        w2 = params.density * params.accel / 36.0;
+
+        if (accel_area.col_or_row == ACCEL_COLUMN)
+        {
+            jj = accel_area.idx;
+            for (i = 0; i < params.ny; i++)
+            {
+                /* if the cell is not occupied and
+                ** we don't send a density negative */
+                if (!obstacles[i*params.nx + jj] &&
+                (sp[ii%2].spd[i*params.nx + jj].speeds[4] - w1) > 0.0 &&
+                (sp[ii%2].spd[i*params.nx + jj].speeds[7] - w2) > 0.0 &&
+                (sp[ii%2].spd[i*params.nx + jj].speeds[8] - w2) > 0.0 )
+                {
+                    /* increase 'north-side' densities */
+                    sp[ii%2].spd[i*params.nx + jj].speeds[2] += w1;
+                    sp[ii%2].spd[i*params.nx + jj].speeds[5] += w2;
+                    sp[ii%2].spd[i*params.nx + jj].speeds[6] += w2;
+                    /* decrease 'south-side' densities */
+                    sp[ii%2].spd[i*params.nx + jj].speeds[4] -= w1;
+                    sp[ii%2].spd[i*params.nx + jj].speeds[7] -= w2;
+                    sp[ii%2].spd[i*params.nx + jj].speeds[8] -= w2;
+                }
+            }
+        }
+        else
+        {
+            // Know where to start from
+            i = accel_area.idx * params.nx;
+            for (jj = i; jj < (i+params.nx); jj++)
+            {
+                /* if the cell is not occupied and
+                ** we don't send a density negative */
+                if (!obstacles[jj] &&
+                (sp[ii%2].spd[jj].speeds[3] - w1) > 0.0 &&
+                (sp[ii%2].spd[jj].speeds[6] - w2) > 0.0 &&
+                (sp[ii%2].spd[jj].speeds[7] - w2) > 0.0 )
+                {
+                    /* increase 'east-side' densities */
+                    sp[ii%2].spd[jj].speeds[1] += w1;
+                    sp[ii%2].spd[jj].speeds[5] += w2;
+                    sp[ii%2].spd[jj].speeds[8] += w2;
+                    /* decrease 'west-side' densities */
+                    sp[ii%2].spd[jj].speeds[3] -= w1;
+                    sp[ii%2].spd[jj].speeds[6] -= w2;
+                    sp[ii%2].spd[jj].speeds[7] -= w2;
+                }
+            }
+        }
+        av_vels[ii] = collision(params,sp[ii%2].spd, sp[(ii+1)%2].spd,obstacles);
     }
 
     gettimeofday(&timstr,NULL);
@@ -118,14 +166,14 @@ int main(int argc, char* argv[])
     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-    write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels);
+    write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels, total_cells);
     finalise(&cells, &tmp_cells, &obstacles, &av_vels);
 
     return EXIT_SUCCESS;
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels)
+    const param_t params, speed_t* cells, int* obstacles, float* av_vels, int total_cells)
 {
     FILE* fp;                     /* file pointer */
     int ii,jj,kk;                 /* generic counters */
@@ -204,7 +252,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-        fprintf(fp,"%d:\t%.12E\n", ii, av_vels[ii]);
+        fprintf(fp,"%d:\t%.12E\n", ii, av_vels[ii]/(float)total_cells);
     }
 
     fclose(fp);

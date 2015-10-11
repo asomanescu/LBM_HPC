@@ -47,10 +47,10 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* paramfile, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr);
+    int** obstacles_ptr, float** av_vels_ptr, int* total_cells);
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels);
+    const param_t params, speed_t* cells, int* obstacles, float* av_vels, int total_cells);
 
 void finalise(speed_t** cells_ptr, speed_t** tmp_cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr);
@@ -61,7 +61,7 @@ void accelerate_flow(const param_t params, const accel_area_t accel_area,
     speed_t* cells, int* obstacles);
 void propagate(const param_t params, speed_t* cells, speed_t* tmp_cells);
 void rebound(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
-void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
+float collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
 
 /* Sum all the densities in the grid.
 ** The total should remain constant from one timestep to the next. */
