@@ -50,7 +50,7 @@ void initialise(const char* paramfile, accel_area_t * accel_area,
     unsigned** obstacles_ptr, float** av_vels_ptr, unsigned* total_cells);
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, float* cells, unsigned* obstacles, float* av_vels);
+    const param_t params, float* cells, unsigned* obstacles, float* av_vels, unsigned total_cells);
 
 void finalise(float** cells_ptr, float** tmp_cells_ptr,
     unsigned** obstacles_ptr, float** av_vels_ptr);

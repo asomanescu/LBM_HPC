@@ -92,9 +92,11 @@ int main(int argc, char* argv[])
     // sp[1] = tmp_cells;
     const float w0 = 4.0/9.0;    /* weighting factor */
     const float w[] = {1.0/9.0, 1.0/36.0};    /* weighting factor */
+    const float w1 = params.density * params.accel * w[0];
+    const float w2 = params.density * params.accel * w[1];
     const unsigned total_num = params.nx * params.ny;
     const float one = 1.0;
-    float w1,w2;  /* weighting factors */
+    // float w1,w2;  /* weighting factors */
     // const float w2 = 1.0/36.0;   /* weighting factor */
            /* directional velocities */
     float tot_u = 0.0;
@@ -123,9 +125,6 @@ int main(int argc, char* argv[])
         short const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
-        w1 = params.density * params.accel * w[0];
-        w2 = params.density * params.accel * w[1];
-
         if (accel_area.col_or_row == ACCEL_COLUMN)
         {
             jj = accel_area.idx;
@@ -233,10 +232,10 @@ int main(int argc, char* argv[])
             }
 
             /* compute x velocity component */
-            *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7))) / local_density;
+            *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7)))/local_density;
 
             /* compute y velocity component */
-            *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8))) / local_density;
+            *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8)))/local_density;
 
             /* velocity squared */
             u_sq = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
@@ -251,7 +250,7 @@ int main(int argc, char* argv[])
             *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
             *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
 
-            d_equ = w0 * local_density * (one - (3.0*u_sq) / 2.0);
+            d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
             /* relaxation step */
             *(*(sp + temp) + ii) = (*t + params.omega * (d_equ - *t));
             for (kk = 1; kk < NSPEEDS; kk++)
@@ -265,7 +264,7 @@ int main(int argc, char* argv[])
 
     }
 }
-    av_vels[i] = tot_u / (float)total_cells;
+    av_vels[i] = tot_u;
         // accelerate_flow(params,accel_area,sp[(i)%2],obstacles);
     // propagate(params,cells,tmp_cells);
     // rebound(params,cells,tmp_cells,obstacles);
@@ -289,14 +288,14 @@ int main(int argc, char* argv[])
     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-    write_values(final_state_file, av_vels_file, params, sp[i%2], obstacles, av_vels);
+    write_values(final_state_file, av_vels_file, params, sp[i%2], obstacles, av_vels, total_cells);
     finalise(&sp[i%2], &sp[(i+1)%2], &obstacles, &av_vels);
 
     return EXIT_SUCCESS;
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, float* cells, unsigned* obstacles, float* av_vels)
+    const param_t params, float* cells, unsigned* obstacles, float* av_vels, unsigned total_cells)
 {
     FILE* fp;                     /* file pointer */
     int ii,kk;                 /* generic counters */
@@ -414,7 +413,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-        fprintf(fp,"%d:\t%.12E\n", ii, av_vels[ii]);
+        fprintf(fp,"%d:\t%.12E\n", ii, av_vels[ii]/(float) total_cells);
     }
 
     fclose(fp);
