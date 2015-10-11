@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
     ** NB the collision step is called after
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
-    unsigned ii,kk,jj,ri,rj;                 /* generic counters */
+    unsigned ii,kk,ri,rj;                 /* generic counters */
     unsigned x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
     // int cell, tmp;
     float u_sq;                  /* squared velocity */
@@ -119,68 +119,19 @@ int main(int argc, char* argv[])
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 // const float c_sq = 1.0/3.0;  /* square of speed of sound */
 
-    for (i = 0; i < params.max_iters; i++)
+    for (i = 0; i <= params.max_iters; i++)
     {
         short const cell = i%2;
         short const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
-        if (accel_area.col_or_row == ACCEL_COLUMN)
-        {
-            jj = accel_area.idx;
-#pragma omp parallel for schedule(guided)
-            for (ii = 0; ii < params.ny; ii++)
-            {
-                unsigned const res = ii*params.nx + jj;
-                /* if the cell is not occupied and
-                ** we don't send a density negative */
-                if (!obstacles[res] &&
-                (*(*(sp + cell) + 4*total_num + res) - w1) > 0.0 &&
-                (*(*(sp + cell) + 7*total_num + res) - w2) > 0.0 &&
-                (*(*(sp + cell) + 8*total_num + res) - w2) > 0.0 )
-                {
-                     // increase 'north-side' densities 
-                    *(*(sp + cell) + 2*total_num + res) += w1;
-                    *(*(sp + cell) + 5*total_num + res) += w2;
-                    *(*(sp + cell) + 6*total_num + res) += w2;
-                    /* decrease 'south-side' densities */
-                    *(*(sp + cell) + 4*total_num + res) -= w1;
-                    *(*(sp + cell) + 7*total_num + res) -= w2;
-                    *(*(sp + cell) + 8*total_num + res) -= w2;
-                }
-            }
-        }
-        else
-        {
-            // Know where to start from
-            ii = accel_area.idx * params.nx;
-
-#pragma omp parallel for private(jj) schedule(guided)
-            for (jj = ii; jj < (ii+params.nx); jj++) {
-                /* if the cell is not occupied and
-                ** we don't send a density negative */
-                if (!obstacles[jj] &&
-                (*(*(sp + cell) + 3*total_num + jj) - w1) > 0.0 &&
-                (*(*(sp + cell) + 6*total_num + jj) - w2) > 0.0 &&
-                (*(*(sp + cell) + 7*total_num + jj) - w2) > 0.0 )
-                {
-                    /* increase 'east-side' densities */
-                    *(*(sp + cell) + 1*total_num + jj) += w1;
-                    *(*(sp + cell) + 5*total_num + jj) += w2;
-                    *(*(sp + cell) + 8*total_num + jj) += w2;
-                    /* decrease 'west-side' densities */
-                    *(*(sp + cell) + 3*total_num + jj) -= w1;
-                    *(*(sp + cell) + 6*total_num + jj) -= w2;
-                    *(*(sp + cell) + 7*total_num + jj) -= w2;
-                }
-            }
-        }
 
 #pragma omp parallel private(ii, kk, ri, rj, u_sq, local_density, t , u, d_equ, x_e,x_w,y_n,y_s)
     {
 
-#pragma omp for reduction(+:tot_u) schedule(guided) nowait
-    for (ii = 0; ii < total_num; ii++) {
+#pragma omp for reduction(+:tot_u) schedule(dynamic, 1000) nowait
+    for (ii = 0; ii < total_num; ii++) 
+    {
         // printf("%d .... %d \n", omp_get_thread_num(), ii);
         ri = ii/params.nx;
         rj = ii%params.nx;
@@ -240,9 +191,6 @@ int main(int argc, char* argv[])
             /* velocity squared */
             u_sq = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
 
-            /* directional velocity components */
-            // *(u + 1) =   u_x;        /* east */
-            // *(u + 2) =         u_y;  /* north */
             *(u + 3) = - *(u + 1);        /* west */
             *(u + 4) =        - *(u + 2);  /* south */
             *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
@@ -260,17 +208,44 @@ int main(int argc, char* argv[])
                 *(*(sp + temp) + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
             }
             tot_u = tot_u + sqrt(u_sq);  
+            if (accel_area.col_or_row == ACCEL_COLUMN && rj == accel_area.idx) {
+                /* if the cell is not occupied and
+                ** we don't send a density negative */
+                if (
+                (*(*(sp + temp) + 4*total_num + ii) - w1) > 0.0 &&
+                (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 &&
+                (*(*(sp + temp) + 8*total_num + ii) - w2) > 0.0 )
+                {
+                     // increase 'north-side' densities 
+                    *(*(sp + temp) + 2*total_num + ii) += w1;
+                    *(*(sp + temp) + 5*total_num + ii) += w2;
+                    *(*(sp + temp) + 6*total_num + ii) += w2;
+                    /* decrease 'south-side' densities */
+                    *(*(sp + temp) + 4*total_num + ii) -= w1;
+                    *(*(sp + temp) + 7*total_num + ii) -= w2;
+                    *(*(sp + temp) + 8*total_num + ii) -= w2;
+                }
+            } else if ( accel_area.col_or_row == ACCEL_ROW && ri == accel_area.idx) {
+                if (
+                (*(*(sp + temp) + 3*total_num + ii) - w1) > 0.0 &&
+                (*(*(sp + temp) + 6*total_num + ii) - w2) > 0.0 &&
+                (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 )
+                {
+                    /* increase 'east-side' densities */
+                    *(*(sp + temp) + 1*total_num + ii) += w1;
+                    *(*(sp + temp) + 5*total_num + ii) += w2;
+                    *(*(sp + temp) + 8*total_num + ii) += w2;
+                    /* decrease 'west-side' densities */
+                    *(*(sp + temp) + 3*total_num + ii) -= w1;
+                    *(*(sp + temp) + 6*total_num + ii) -= w2;
+                    *(*(sp + temp) + 7*total_num + ii) -= w2;
+                }
+            }
         }
-
     }
+
 }
     av_vels[i] = tot_u;
-        // accelerate_flow(params,accel_area,sp[(i)%2],obstacles);
-    // propagate(params,cells,tmp_cells);
-    // rebound(params,cells,tmp_cells,obstacles);
-        // av_vels[i] = collision(params,sp[(i)%2],sp[(i+1)%2],obstacles, total_cells);
-        // av_vels[ii] = timestep(params, accel_area, sp[icell], sp[(ii+1)%2], obstacles, total_cells);
-        // av_vels[ii] = av_velocity(params, sp[(ii+1)%2].spd, obstacles);
 
     }
 
@@ -411,9 +386,9 @@ void write_values(const char * final_state_file, const char * av_vels_file,
         DIE("could not open file output file");
     }
 
-    for (ii = 0; ii < params.max_iters; ii++)
+    for (ii = 1; ii <= params.max_iters; ii++)
     {
-        fprintf(fp,"%d:\t%.12E\n", ii, av_vels[ii]/(float) total_cells);
+        fprintf(fp,"%d:\t%.12E\n", ii-1, av_vels[ii]/(float) total_cells);
     }
 
     fclose(fp);
