@@ -141,7 +141,6 @@ void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* ob
     const float w[] = {1.0/9.0, 1.0/36.0};    /* weighting factor */
     // const float w2 = 1.0/36.0;   /* weighting factor */
 
-    float u_x,u_y;               /* av. velocities in x and y directions */
     float u_sq;                  /* squared velocity */
     float local_density;         /* sum of densities in a particular cell */
     float u[NSPEEDS];            /* directional velocities */
@@ -174,7 +173,7 @@ void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* ob
             }
 
             /* compute x velocity component */
-            u_x = (tmp_cells[ii].speeds[1] +
+            u[1] = (tmp_cells[ii].speeds[1] +
                     tmp_cells[ii].speeds[5] +
                     tmp_cells[ii].speeds[8]
                 - (tmp_cells[ii].speeds[3] +
@@ -183,7 +182,7 @@ void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* ob
                 / local_density;
 
             /* compute y velocity component */
-            u_y = (tmp_cells[ii].speeds[2] +
+            u[2] = (tmp_cells[ii].speeds[2] +
                     tmp_cells[ii].speeds[5] +
                     tmp_cells[ii].speeds[6]
                 - (tmp_cells[ii].speeds[4] +
@@ -192,17 +191,17 @@ void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* ob
                 / local_density;
 
             /* velocity squared */
-            u_sq = u_x * u_x + u_y * u_y;
+            u_sq = u[1] * u[1] + u[2] * u[2];
 
             /* directional velocity components */
-            u[1] =   u_x;        /* east */
-            u[2] =         u_y;  /* north */
-            u[3] = - u_x;        /* west */
-            u[4] =       - u_y;  /* south */
-            u[5] =   u_x + u_y;  /* north-east */
-            u[6] = - u_x + u_y;  /* north-west */
-            u[7] = - u_x - u_y;  /* south-west */
-            u[8] =   u_x - u_y;  /* south-east */
+            u[1] =   u[1];        /* east */
+            u[2] =         u[2];  /* north */
+            u[3] = - u[1];        /* west */
+            u[4] =       - u[2];  /* south */
+            u[5] =   u[1] + u[2];  /* north-east */
+            u[6] = - u[1] + u[2];  /* north-west */
+            u[7] = - u[1] - u[2];  /* south-west */
+            u[8] =   u[1] - u[2];  /* south-east */
 
             d_equ = w0 * local_density * (1.0 - u_sq / (2.0 * c_sq));
             /* relaxation step */
