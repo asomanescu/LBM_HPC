@@ -244,7 +244,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos <  obstacles[kk].obs_y_max)
                 {
                     (*obstacles_ptr)[ii*params->nx + jj] = 1;
-                    total_cells--;
+                    *total_cells = *total_cells -  1;
                 }
             }
         }
