@@ -106,14 +106,8 @@ int main(int argc, char* argv[])
     ** NB the collision step is called after
     ** the propagate step and so values of interest
     ** are in the scratch-space grid */
-    unsigned ii,kk,ri,rj;                 /* generic counters */
-    unsigned x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
+    // unsigned ii,kk,ri,rj;                 /* generic counters */
     // int cell, tmp;
-    float u_sq;                  /* squared velocity */
-    float local_density;         /* sum of densities in a particular cell */
-    float t[NSPEEDS];
-    float u[NSPEEDS]; 
-    float d_equ;        /* equilibrium densities */
     /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
@@ -126,125 +120,135 @@ int main(int argc, char* argv[])
         /* compute weighting factors */
         tot_u = 0.0;
 
-#pragma omp parallel private(ii, kk, ri, rj, u_sq, local_density, t , u, d_equ, x_e,x_w,y_n,y_s)
+    #pragma omp parallel reduction(+:tot_u)
     {
-
-#pragma omp for reduction(+:tot_u) schedule(dynamic, 1000) nowait
-    for (ii = 0; ii < total_num; ii++) 
-    {
-        // printf("%d .... %d \n", omp_get_thread_num(), ii);
-        ri = ii/params.nx;
-        rj = ii%params.nx;
-        if (ri == 0) {
-            y_s = ri + params.ny - 1;
-            y_n = ri + 1;
-        } else if (ri == params.ny - 1) {
-            y_n = 0;
-            y_s = ri - 1;
-        } else {
-            y_n = ri + 1;
-            y_s = ri - 1;
-        }
-        if (rj == 0 ) {
-            x_w = rj + params.nx - 1;
-            x_e = rj + 1;
-        } else if ( rj == params.nx - 1) {
-            x_e = 0;
-            x_w = rj - 1;
-        } else {
-            x_e = rj + 1;
-            x_w = rj - 1;
-        }
-        *t = *(*(sp + cell) + ii);
-        *(t + 1) = *(*(sp + cell) + total_num   + ri*params.nx  + x_w);
-        *(t + 2) = *(*(sp + cell) + total_num*2 + y_s*params.nx + rj);
-        *(t + 3) = *(*(sp + cell) + total_num*3 + ri*params.nx  + x_e);
-        *(t + 4) = *(*(sp + cell) + total_num*4 + y_n*params.nx + rj);
-        *(t + 5) = *(*(sp + cell) + total_num*5 + y_s*params.nx + x_w);
-        *(t + 6) = *(*(sp + cell) + total_num*6 + y_s*params.nx + x_e);
-        *(t + 7) = *(*(sp + cell) + total_num*7 + y_n*params.nx + x_e);
-        *(t + 8) = *(*(sp + cell) + total_num*8 + y_n*params.nx + x_w);
-        if (obstacles[ii]) {
-            *(*(sp + temp) + 1*total_num + ii) = *(t + 3);
-            *(*(sp + temp) + 2*total_num + ii) = *(t + 4);
-            *(*(sp + temp) + 3*total_num + ii) = *(t + 1);
-            *(*(sp + temp) + 4*total_num + ii) = *(t + 2);
-            *(*(sp + temp) + 5*total_num + ii) = *(t + 7);
-            *(*(sp + temp) + 6*total_num + ii) = *(t + 8);
-            *(*(sp + temp) + 7*total_num + ii) = *(t + 5);
-            *(*(sp + temp) + 8*total_num + ii) = *(t + 6);
-        } else {
-            
-            local_density = 0.0;
-
-            for (kk = 0; kk < NSPEEDS; kk++)
+        
+        unsigned x_e,x_w,y_n,y_s;
+        float tot_u_thread = 0.0;
+        float local_density = 0.0;
+        float t[NSPEEDS];
+        float u[NSPEEDS];
+        float u_sq;
+        short kk;
+        float d_equ;
+        unsigned ii, ri, rj;
+        #pragma omp for schedule(guided) nowait
+            for (ii = 0; ii < total_num; ii++) 
             {
-                local_density += *(t + kk);
-            }
-
-            /* compute x velocity component */
-            *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7)))/local_density;
-
-            /* compute y velocity component */
-            *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8)))/local_density;
-
-            /* velocity squared */
-            u_sq = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
-
-            *(u + 3) = - *(u + 1);        /* west */
-            *(u + 4) =        - *(u + 2);  /* south */
-            *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
-            *(u + 6) = - *(u + 1) + *(u + 2);  /* north-west */
-            *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
-            *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
-
-            d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
-            /* relaxation step */
-            *(*(sp + temp) + ii) = (*t + params.omega * (d_equ - *t));
-            for (kk = 1; kk < NSPEEDS; kk++)
-            {
-                d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
-                    +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
-                *(*(sp + temp) + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
-            }
-            tot_u = tot_u + sqrt(u_sq);  
-            if (accel_area.col_or_row == ACCEL_COLUMN && rj == accel_area.idx) {
-                /* if the cell is not occupied and
-                ** we don't send a density negative */
-                if (
-                (*(*(sp + temp) + 4*total_num + ii) - w1) > 0.0 &&
-                (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 &&
-                (*(*(sp + temp) + 8*total_num + ii) - w2) > 0.0 )
-                {
-                     // increase 'north-side' densities 
-                    *(*(sp + temp) + 2*total_num + ii) += w1;
-                    *(*(sp + temp) + 5*total_num + ii) += w2;
-                    *(*(sp + temp) + 6*total_num + ii) += w2;
-                    /* decrease 'south-side' densities */
-                    *(*(sp + temp) + 4*total_num + ii) -= w1;
-                    *(*(sp + temp) + 7*total_num + ii) -= w2;
-                    *(*(sp + temp) + 8*total_num + ii) -= w2;
+                // printf("%d .... %d \n", omp_get_thread_num(), ii);
+                ri = ii/params.nx;
+                rj = ii%params.nx;
+                if (ri == 0) {
+                    y_s = ri + params.ny - 1;
+                    y_n = ri + 1;
+                } else if (ri == params.ny - 1) {
+                    y_n = 0;
+                    y_s = ri - 1;
+                } else {
+                    y_n = ri + 1;
+                    y_s = ri - 1;
                 }
-            } else if ( accel_area.col_or_row == ACCEL_ROW && ri == accel_area.idx) {
-                if (
-                (*(*(sp + temp) + 3*total_num + ii) - w1) > 0.0 &&
-                (*(*(sp + temp) + 6*total_num + ii) - w2) > 0.0 &&
-                (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 )
-                {
-                    /* increase 'east-side' densities */
-                    *(*(sp + temp) + 1*total_num + ii) += w1;
-                    *(*(sp + temp) + 5*total_num + ii) += w2;
-                    *(*(sp + temp) + 8*total_num + ii) += w2;
-                    /* decrease 'west-side' densities */
-                    *(*(sp + temp) + 3*total_num + ii) -= w1;
-                    *(*(sp + temp) + 6*total_num + ii) -= w2;
-                    *(*(sp + temp) + 7*total_num + ii) -= w2;
+                if (rj == 0 ) {
+                    x_w = rj + params.nx - 1;
+                    x_e = rj + 1;
+                } else if ( rj == params.nx - 1) {
+                    x_e = 0;
+                    x_w = rj - 1;
+                } else {
+                    x_e = rj + 1;
+                    x_w = rj - 1;
+                }
+                *t = *(*(sp + cell) + ii);
+                *(t + 1) = *(*(sp + cell) + total_num   + ri*params.nx  + x_w);
+                *(t + 2) = *(*(sp + cell) + total_num*2 + y_s*params.nx + rj);
+                *(t + 3) = *(*(sp + cell) + total_num*3 + ri*params.nx  + x_e);
+                *(t + 4) = *(*(sp + cell) + total_num*4 + y_n*params.nx + rj);
+                *(t + 5) = *(*(sp + cell) + total_num*5 + y_s*params.nx + x_w);
+                *(t + 6) = *(*(sp + cell) + total_num*6 + y_s*params.nx + x_e);
+                *(t + 7) = *(*(sp + cell) + total_num*7 + y_n*params.nx + x_e);
+                *(t + 8) = *(*(sp + cell) + total_num*8 + y_n*params.nx + x_w);
+                if (obstacles[ii]) {
+                    *(*(sp + temp) + 1*total_num + ii) = *(t + 3);
+                    *(*(sp + temp) + 2*total_num + ii) = *(t + 4);
+                    *(*(sp + temp) + 3*total_num + ii) = *(t + 1);
+                    *(*(sp + temp) + 4*total_num + ii) = *(t + 2);
+                    *(*(sp + temp) + 5*total_num + ii) = *(t + 7);
+                    *(*(sp + temp) + 6*total_num + ii) = *(t + 8);
+                    *(*(sp + temp) + 7*total_num + ii) = *(t + 5);
+                    *(*(sp + temp) + 8*total_num + ii) = *(t + 6);
+                } else {
+                    
+                    local_density = 0.0;
+
+                    for (kk = 0; kk < NSPEEDS; kk++)
+                    {
+                        local_density += *(t + kk);
+                    }
+
+                    /* compute x velocity component */
+                    *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7)))/local_density;
+
+                    /* compute y velocity component */
+                    *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8)))/local_density;
+
+                    /* velocity squared */
+                    u_sq = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
+
+                    *(u + 3) = - *(u + 1);        /* west */
+                    *(u + 4) =        - *(u + 2);  /* south */
+                    *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
+                    *(u + 6) = - *(u + 1) + *(u + 2);  /* north-west */
+                    *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
+                    *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
+
+                    d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
+                    /* relaxation step */
+                    *(*(sp + temp) + ii) = (*t + params.omega * (d_equ - *t));
+                    for (kk = 1; kk < NSPEEDS; kk++)
+                    {
+                        d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
+                            +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
+                        *(*(sp + temp) + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
+                    }
+                    tot_u_thread = tot_u_thread + sqrt(u_sq);  
+                    if (accel_area.col_or_row == ACCEL_COLUMN && rj == accel_area.idx) {
+                        /* if the cell is not occupied and
+                        ** we don't send a density negative */
+                        if (
+                        (*(*(sp + temp) + 4*total_num + ii) - w1) > 0.0 &&
+                        (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 &&
+                        (*(*(sp + temp) + 8*total_num + ii) - w2) > 0.0 )
+                        {
+                             // increase 'north-side' densities 
+                            *(*(sp + temp) + 2*total_num + ii) += w1;
+                            *(*(sp + temp) + 5*total_num + ii) += w2;
+                            *(*(sp + temp) + 6*total_num + ii) += w2;
+                            /* decrease 'south-side' densities */
+                            *(*(sp + temp) + 4*total_num + ii) -= w1;
+                            *(*(sp + temp) + 7*total_num + ii) -= w2;
+                            *(*(sp + temp) + 8*total_num + ii) -= w2;
+                        }
+                    } else if ( accel_area.col_or_row == ACCEL_ROW && ri == accel_area.idx) {
+                        if (
+                        (*(*(sp + temp) + 3*total_num + ii) - w1) > 0.0 &&
+                        (*(*(sp + temp) + 6*total_num + ii) - w2) > 0.0 &&
+                        (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 )
+                        {
+                            /* increase 'east-side' densities */
+                            *(*(sp + temp) + 1*total_num + ii) += w1;
+                            *(*(sp + temp) + 5*total_num + ii) += w2;
+                            *(*(sp + temp) + 8*total_num + ii) += w2;
+                            /* decrease 'west-side' densities */
+                            *(*(sp + temp) + 3*total_num + ii) -= w1;
+                            *(*(sp + temp) + 6*total_num + ii) -= w2;
+                            *(*(sp + temp) + 7*total_num + ii) -= w2;
+                        }
+                    }
                 }
             }
-        }
+        tot_u = tot_u + tot_u_thread;
+
     }
-
-}
     av_vels[i] = tot_u;
 
     }
