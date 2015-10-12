@@ -188,7 +188,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
     if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
 
-    *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters));
+    *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters + 1));
     if (*av_vels_ptr == NULL) DIE("Cannot allocate memory for av_vels");
 
     w0 = params->density * 4.0/9.0;
