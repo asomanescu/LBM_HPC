@@ -63,6 +63,12 @@
 ** main program:
 ** initialise, timestep loop, finalise
 */
+
+void swap_cells(float **c, float **t) {
+	float *tmp = *c;
+	*c = *t;
+	*t = tmp;
+}
 int main(int argc, char* argv[])
 {
     char * final_state_file = NULL;
@@ -77,6 +83,8 @@ int main(int argc, char* argv[])
     unsigned*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
     float* sp[2];
+    float *cells;
+    float *tmp_cells;
     unsigned total_cells;
     unsigned    i;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
@@ -87,7 +95,7 @@ int main(int argc, char* argv[])
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
-    initialise(param_file, &accel_area, &params, &sp[0], &sp[1], &obstacles, &av_vels, &total_cells);
+    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels, &total_cells);
     // sp[0] = cells;
     // sp[1] = tmp_cells;
     const float w0 = 4.0/9.0;    /* weighting factor */
@@ -112,17 +120,14 @@ int main(int argc, char* argv[])
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 // const float c_sq = 1.0/3.0;  /* square of speed of sound */
-
     for (i = 0; i <= params.max_iters; i++)
     {
-        short const cell = i%2;
-        short const temp = (i+1)%2;
+        //short const cell = i%2;
+        //short const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
-
     #pragma omp parallel reduction(+:tot_u)
     {
-        
         unsigned x_e,x_w,y_n,y_s;
         float tot_u_thread = 0.0;
         float local_density = 0.0;
@@ -132,7 +137,7 @@ int main(int argc, char* argv[])
         short kk;
         float d_equ;
         unsigned ii, ri, rj;
-        #pragma omp for schedule(guided) nowait
+        #pragma omp for schedule(auto) nowait
             for (ii = 0; ii < total_num; ii++) 
             {
                 // printf("%d .... %d \n", omp_get_thread_num(), ii);
@@ -158,24 +163,24 @@ int main(int argc, char* argv[])
                     x_e = rj + 1;
                     x_w = rj - 1;
                 }
-                *t = *(*(sp + cell) + ii);
-                *(t + 1) = *(*(sp + cell) + total_num   + ri*params.nx  + x_w);
-                *(t + 2) = *(*(sp + cell) + total_num*2 + y_s*params.nx + rj);
-                *(t + 3) = *(*(sp + cell) + total_num*3 + ri*params.nx  + x_e);
-                *(t + 4) = *(*(sp + cell) + total_num*4 + y_n*params.nx + rj);
-                *(t + 5) = *(*(sp + cell) + total_num*5 + y_s*params.nx + x_w);
-                *(t + 6) = *(*(sp + cell) + total_num*6 + y_s*params.nx + x_e);
-                *(t + 7) = *(*(sp + cell) + total_num*7 + y_n*params.nx + x_e);
-                *(t + 8) = *(*(sp + cell) + total_num*8 + y_n*params.nx + x_w);
+                *t = *(cells + ii);
+                *(t + 1) = *(cells + total_num   + ri*params.nx  + x_w);
+                *(t + 2) = *(cells + total_num*2 + y_s*params.nx + rj);
+                *(t + 3) = *(cells + total_num*3 + ri*params.nx  + x_e);
+                *(t + 4) = *(cells + total_num*4 + y_n*params.nx + rj);
+                *(t + 5) = *(cells + total_num*5 + y_s*params.nx + x_w);
+                *(t + 6) = *(cells + total_num*6 + y_s*params.nx + x_e);
+                *(t + 7) = *(cells + total_num*7 + y_n*params.nx + x_e);
+                *(t + 8) = *(cells + total_num*8 + y_n*params.nx + x_w);
                 if (obstacles[ii]) {
-                    *(*(sp + temp) + 1*total_num + ii) = *(t + 3);
-                    *(*(sp + temp) + 2*total_num + ii) = *(t + 4);
-                    *(*(sp + temp) + 3*total_num + ii) = *(t + 1);
-                    *(*(sp + temp) + 4*total_num + ii) = *(t + 2);
-                    *(*(sp + temp) + 5*total_num + ii) = *(t + 7);
-                    *(*(sp + temp) + 6*total_num + ii) = *(t + 8);
-                    *(*(sp + temp) + 7*total_num + ii) = *(t + 5);
-                    *(*(sp + temp) + 8*total_num + ii) = *(t + 6);
+                    *(tmp_cells + 1*total_num + ii) = *(t + 3);
+                    *(tmp_cells + 2*total_num + ii) = *(t + 4);
+                    *(tmp_cells + 3*total_num + ii) = *(t + 1);
+                    *(tmp_cells + 4*total_num + ii) = *(t + 2);
+                    *(tmp_cells + 5*total_num + ii) = *(t + 7);
+                    *(tmp_cells + 6*total_num + ii) = *(t + 8);
+                    *(tmp_cells + 7*total_num + ii) = *(t + 5);
+                    *(tmp_cells + 8*total_num + ii) = *(t + 6);
                 } else {
                     
                     local_density = 0.0;
@@ -203,45 +208,45 @@ int main(int argc, char* argv[])
 
                     d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
                     /* relaxation step */
-                    *(*(sp + temp) + ii) = (*t + params.omega * (d_equ - *t));
+                    *(tmp_cells + ii) = (*t + params.omega * (d_equ - *t));
                     for (kk = 1; kk < NSPEEDS; kk++)
                     {
                         d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
                             +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
-                        *(*(sp + temp) + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
+                        *(tmp_cells + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
                     }
                     tot_u_thread = tot_u_thread + sqrt(u_sq);  
                     if (accel_area.col_or_row == ACCEL_COLUMN && rj == accel_area.idx) {
                         /* if the cell is not occupied and
                         ** we don't send a density negative */
                         if (
-                        (*(*(sp + temp) + 4*total_num + ii) - w1) > 0.0 &&
-                        (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 &&
-                        (*(*(sp + temp) + 8*total_num + ii) - w2) > 0.0 )
+                        (*(tmp_cells + 4*total_num + ii) - w1) > 0.0 &&
+                        (*(tmp_cells + 7*total_num + ii) - w2) > 0.0 &&
+                        (*(tmp_cells + 8*total_num + ii) - w2) > 0.0 )
                         {
                              // increase 'north-side' densities 
-                            *(*(sp + temp) + 2*total_num + ii) += w1;
-                            *(*(sp + temp) + 5*total_num + ii) += w2;
-                            *(*(sp + temp) + 6*total_num + ii) += w2;
+                            *(tmp_cells + 2*total_num + ii) += w1;
+                            *(tmp_cells + 5*total_num + ii) += w2;
+                            *(tmp_cells + 6*total_num + ii) += w2;
                             /* decrease 'south-side' densities */
-                            *(*(sp + temp) + 4*total_num + ii) -= w1;
-                            *(*(sp + temp) + 7*total_num + ii) -= w2;
-                            *(*(sp + temp) + 8*total_num + ii) -= w2;
+                            *(tmp_cells + 4*total_num + ii) -= w1;
+                            *(tmp_cells + 7*total_num + ii) -= w2;
+                            *(tmp_cells + 8*total_num + ii) -= w2;
                         }
                     } else if ( accel_area.col_or_row == ACCEL_ROW && ri == accel_area.idx) {
                         if (
-                        (*(*(sp + temp) + 3*total_num + ii) - w1) > 0.0 &&
-                        (*(*(sp + temp) + 6*total_num + ii) - w2) > 0.0 &&
-                        (*(*(sp + temp) + 7*total_num + ii) - w2) > 0.0 )
+                        (*(tmp_cells + 3*total_num + ii) - w1) > 0.0 &&
+                        (*(tmp_cells + 6*total_num + ii) - w2) > 0.0 &&
+                        (*(tmp_cells + 7*total_num + ii) - w2) > 0.0 )
                         {
                             /* increase 'east-side' densities */
-                            *(*(sp + temp) + 1*total_num + ii) += w1;
-                            *(*(sp + temp) + 5*total_num + ii) += w2;
-                            *(*(sp + temp) + 8*total_num + ii) += w2;
+                            *(tmp_cells + 1*total_num + ii) += w1;
+                            *(tmp_cells + 5*total_num + ii) += w2;
+                            *(tmp_cells + 8*total_num + ii) += w2;
                             /* decrease 'west-side' densities */
-                            *(*(sp + temp) + 3*total_num + ii) -= w1;
-                            *(*(sp + temp) + 6*total_num + ii) -= w2;
-                            *(*(sp + temp) + 7*total_num + ii) -= w2;
+                            *(tmp_cells + 3*total_num + ii) -= w1;
+                            *(tmp_cells + 6*total_num + ii) -= w2;
+                            *(tmp_cells + 7*total_num + ii) -= w2;
                         }
                     }
                 }
@@ -250,6 +255,8 @@ int main(int argc, char* argv[])
 
     }
     av_vels[i] = tot_u;
+	swap_cells(&cells, &tmp_cells);
+
 
     }
 
@@ -262,13 +269,13 @@ int main(int argc, char* argv[])
     systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
     printf("==done==\n");
-    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,sp[i%2],obstacles));
+    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,cells,obstacles));
     printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-    write_values(final_state_file, av_vels_file, params, sp[i%2], obstacles, av_vels, total_cells);
-    finalise(&sp[i%2], &sp[(i+1)%2], &obstacles, &av_vels);
+    write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels, total_cells);
+    finalise(&cells, &tmp_cells, &obstacles, &av_vels);
 
     return EXIT_SUCCESS;
 }
