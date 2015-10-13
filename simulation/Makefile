@@ -1,6 +1,7 @@
 CC=icc
-
-CFLAGS= -O3 -no-prec-div -xHOST -ipo -qopenmp -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
+#CC=gcc
+#CFLAGS=-O3 -fopenmp
+CFLAGS= -O3 -no-prec-div -ipo -xHOST -qopenmp -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
 
 EXE=lbm
 
