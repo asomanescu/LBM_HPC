@@ -139,8 +139,83 @@ int main(int argc, char* argv[])
         short kk;
         float d_equ;
         unsigned ii, ri, rj;
-        #pragma omp for schedule(auto) nowait
-            for (ii = 0; ii < total_num; ii++) 
+        if(heights[3] == 1) {
+            #pragma omp for schedule(auto)
+                for (ii = 0; ii< params.nx; ii++) {
+                    ri = params.ny - 1;
+                    rj = ii;
+                    y_n = 0;
+                    // y_s = ri - 1;
+                    if (rj == 0 ) {
+                        x_w = rj + params.nx - 1;
+                        x_e = rj + 1;
+                    } else if ( rj == params.nx - 1) {
+                        x_e = 0;
+                        x_w = rj - 1;
+                    } else {
+                        x_e = rj + 1;
+                        x_w = rj - 1;
+                    }
+                    // *t = *(cells + ii);
+                    // *(t + 1) = *(cells + total_num   + ri*params.nx  + x_w);
+                    *(t + 2) = *(cells + total_num*2 + y_s*params.nx + rj);
+                    // *(t + 3) = *(cells + total_num*3 + ri*params.nx  + x_e);
+                    // *(t + 4) = *(cells + total_num*4 + y_n*params.nx + rj);
+                    *(t + 5) = *(cells + total_num*5 + y_s*params.nx + x_w);
+                    *(t + 6) = *(cells + total_num*6 + y_s*params.nx + x_e);
+                    // *(t + 7) = *(cells + total_num*7 + y_n*params.nx + x_e);
+                    // *(t + 8) = *(cells + total_num*8 + y_n*params.nx + x_w);
+                    // *(tmp_cells + 1*total_num + ii) = *(t + 3);
+                    // *(tmp_cells + 2*total_num + ii) = *(t + 4);
+                    // *(tmp_cells + 3*total_num + ii) = *(t + 1);
+                    *(tmp_cells + 4*total_num + ii) = *(t + 2);
+                    // *(tmp_cells + 5*total_num + ii) = *(t + 7);
+                    // *(tmp_cells + 6*total_num + ii) = *(t + 8);
+                    *(tmp_cells + 7*total_num + ii) = *(t + 5);
+                    *(tmp_cells + 8*total_num + ii) = *(t + 6);
+                }
+        }
+        if (heights[2] == 1)
+        {
+            #pragma omp for schedule(auto)
+                for (ii = params.nx*(params.ny - 1); ii< total_num; ii++)
+                {
+
+                    ri = 0;
+                    rj = ii;
+                    y_s = ri + params.ny - 1;
+                    // y_n = ri + 1;
+                    if (rj == 0 ) {
+                        x_w = rj + params.nx - 1;
+                        x_e = rj + 1;
+                    } else if ( rj == params.nx - 1) {
+                        x_e = 0;
+                        x_w = rj - 1;
+                    } else {
+                        x_e = rj + 1;
+                        x_w = rj - 1;
+                    }
+                    // *t = *(cells + ii);
+                    // *(t + 1) = *(cells + total_num   + ri*params.nx  + x_w);
+                    // *(t + 2) = *(cells + total_num*2 + y_s*params.nx + rj);
+                    // *(t + 3) = *(cells + total_num*3 + ri*params.nx  + x_e);
+                    *(t + 4) = *(cells + total_num*4 + y_n*params.nx + rj);
+                    // *(t + 5) = *(cells + total_num*5 + y_s*params.nx + x_w);
+                    // *(t + 6) = *(cells + total_num*6 + y_s*params.nx + x_e);
+                    *(t + 7) = *(cells + total_num*7 + y_n*params.nx + x_e);
+                    *(t + 8) = *(cells + total_num*8 + y_n*params.nx + x_w);
+                    // *(tmp_cells + 1*total_num + ii) = *(t + 3);
+                    *(tmp_cells + 2*total_num + ii) = *(t + 4);
+                    // *(tmp_cells + 3*total_num + ii) = *(t + 1);
+                    // *(tmp_cells + 4*total_num + ii) = *(t + 2);
+                    *(tmp_cells + 5*total_num + ii) = *(t + 7);
+                    *(tmp_cells + 6*total_num + ii) = *(t + 8);
+                    // *(tmp_cells + 7*total_num + ii) = *(t + 5);
+                    // *(tmp_cells + 8*total_num + ii) = *(t + 6);
+                }
+        }
+        #pragma omp for schedule(auto)
+            for (ii = heights[0]*params.nx; ii < heights[1]*params.nx; ii++) 
             {
                 // printf("%d .... %d \n", omp_get_thread_num(), ii);
                 ri = ii/params.nx;
