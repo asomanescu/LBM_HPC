@@ -128,16 +128,16 @@ int main(int argc, char* argv[])
         //short const temp = (i+1)%2;
         /* compute weighting factors */
         tot_u = 0.0;
-    #pragma omp parallel reduction(+:tot_u) proc_bind(master)
+    #pragma omp parallel reduction(+:tot_u) //proc_bind(master)
     {
         unsigned x_e,x_w,y_n,y_s;
         float tot_u_thread = 0.0;
         float local_density = 0.0;
         float t[NSPEEDS];
-        float u[NSPEEDS];
-        float u_sq;
-        short kk;
-        float d_equ;
+        float u[5];
+        // float u_sq;
+        // short kk;
+        // float d_equ;
         unsigned ii, ri, rj;
         if(*(heights + 3) == 1) {
             #pragma omp for schedule(auto)
@@ -260,12 +260,13 @@ int main(int argc, char* argv[])
                     *(tmp_cells + 8*total_num + ii) = *(t + 6);
                 } else {
                     
-                    local_density = 0.0;
+		    local_density = *t + *(t + 1) + *(t + 2) + *(t + 3) + *(t + 4) + *(t + 5) + *(t + 6) + *(t + 7) + *(t + 8);
+                    //local_density = 0.0;
 
-                    for (kk = 0; kk < NSPEEDS; kk++)
-                    {
-                        local_density += *(t + kk);
-                    }
+                    //for (kk = 0; kk < NSPEEDS; kk++)
+                    //{
+                    //    local_density += *(t + kk);
+                    //}
 
                     /* compute x velocity component */
                     *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7)))/local_density;
@@ -274,25 +275,42 @@ int main(int argc, char* argv[])
                     *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8)))/local_density;
 
                     /* velocity squared */
-                    u_sq = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
-
-                    *(u + 3) = - *(u + 1);        /* west */
-                    *(u + 4) =        - *(u + 2);  /* south */
-                    *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
-                    *(u + 6) = - *(u + 1) + *(u + 2);  /* north-west */
-                    *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
-                    *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
-
-                    d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
+                    *u = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
+                    // *(u + 3) = - *(u + 1);        /* west */
+                    // *(u + 4) =        - *(u + 2);  /* south */
+                    // *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
+                    // *(u + 6) = - *(u + 1) + *(u + 2);  /* north-west */
+                    // *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
+                    // *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
+                    *(u + 3) = *(u + 1) + *(u + 2);
+                    *(u + 4) = -*(u + 1) + *(u + 2);
+                    *(tmp_cells + ii) = (*t + params.omega * ((w0 * local_density - local_density*(2.0**u) / (3.0)) - *t));
+                    *(tmp_cells + total_num + ii) = (*(t + 1) + params.omega * ((*w * local_density * (one + (3.0**(u + 1))
+                            +(4.5**(u + 1)**(u + 1) - 1.5**u))) - *(t + 1)));
+                    *(tmp_cells + 2*total_num + ii) = (*(t + 2) + params.omega * ((*w * local_density * (one + (3.0**(u + 2))
+                            +(4.5**(u + 2)**(u + 2) - 1.5**u))) - *(t + 2)));
+                    *(tmp_cells + 3*total_num + ii) = (*(t + 3) + params.omega * ((*w * local_density * (one - (3.0**(u + 1))
+                            +(4.5**(u + 1)**(u + 1) - 1.5**u))) - *(t + 3)));
+                    *(tmp_cells + 4*total_num + ii) = (*(t + 4) + params.omega * ((*w * local_density * (one - (3.0**(u + 2))
+                            +(4.5**(u + 2)**(u + 2) - 1.5**u))) - *(t + 4)));
+                    *(tmp_cells + 5*total_num + ii) = (*(t + 5) + params.omega * ((*(w + 1) * local_density * (one + (3.0**(u + 3))
+                            +(4.5**(u + 3)**(u + 3) - 1.5**u))) - *(t + 5)));
+                    *(tmp_cells + 6*total_num + ii) = (*(t + 6) + params.omega * ((*(w + 1) * local_density * (one + (3.0**(u + 4))
+                            +(4.5**(u + 4)**(u + 4) - 1.5**u))) - *(t + 6)));
+                    *(tmp_cells + 7*total_num + ii) = (*(t + 7) + params.omega * ((*(w + 1) * local_density * (one - (3.0**(u + 3))
+                            +(4.5**(u + 3)**(u + 3) - 1.5**u))) - *(t + 7)));
+                    *(tmp_cells + 8*total_num + ii) = (*(t + 8) + params.omega * ((*(w + 1) * local_density * (one - (3.0**(u + 4))
+                            +(4.5**(u + 4)**(u + 4) - 1.5**u))) - *(t + 8)));
+                    // d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
                     /* relaxation step */
-                    *(tmp_cells + ii) = (*t + params.omega * (d_equ - *t));
-                    for (kk = 1; kk < NSPEEDS; kk++)
-                    {
-                        d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
-                            +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
-                        *(tmp_cells + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
-                    }
-                    tot_u_thread = tot_u_thread + sqrt(u_sq);  
+                    // *(tmp_cells + ii) = (*t + params.omega * (d_equ - *t));
+                    // for (kk = 1; kk < NSPEEDS; kk++)
+                    // {
+                    //     d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
+                    //         +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
+                    //     *(tmp_cells + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
+                    // }
+                    tot_u_thread = tot_u_thread + sqrt(*u);  
                     if (accel_area.col_or_row == ACCEL_COLUMN && rj == accel_area.idx) {
                         /* if the cell is not occupied and
                         ** we don't send a density negative */
