@@ -1,3 +1,7 @@
+/* THE ONLY THING THAT IS USED IN THIS FILE IS THE AV_VELOCITY FUNCTION*/
+
+
+
 /* Functions pertinent to the outer simulation steps */
 
 #include <math.h>

@@ -78,11 +78,8 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    //float* cells     = NULL;    /* grid containing fluid densities */
-    //float* tmp_cells = NULL;    /* scratch space */
     unsigned char*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
-    float* sp[2];
     float *cells;
     float *tmp_cells;
     unsigned total_cells;
@@ -97,47 +94,26 @@ int main(int argc, char* argv[])
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
     initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels, &total_cells, heights);
-    // sp[0] = cells;
-    // sp[1] = tmp_cells;
     const float w0 = 4.0/9.0;    /* weighting factor */
     const float w[] = {1.0/9.0, 1.0/36.0};    /* weighting factor */
     const float w1 = params.density * params.accel * w[0];
     const float w2 = params.density * params.accel * w[1];
     const unsigned total_num = params.nx * params.ny;
     const float one = 1.0;
-    // float w1,w2;  /* weighting factors */
-    // const float w2 = 1.0/36.0;   /* weighting factor */
-           /* directional velocities */
     float tot_u = 0.0;
-            /* determine indices of axis-direction neighbours
-            ** respecting periodic boundary conditions (wrap around) */
-    /* loop over the cells in the grid
-    ** NB the collision step is called after
-    ** the propagate step and so values of interest
-    ** are in the scratch-space grid */
-    // unsigned ii,kk,ri,rj;                 /* generic counters */
-    // int cell, tmp;
-    /* iterate for max_iters timesteps */
 
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
-// const float c_sq = 1.0/3.0;  /* square of speed of sound */
     for (i = 0; i <= params.max_iters; i++)
     {
-        //short const cell = i%2;
-        //short const temp = (i+1)%2;
-        /* compute weighting factors */
         tot_u = 0.0;
-    #pragma omp parallel reduction(+:tot_u) //proc_bind(master)
+    #pragma omp parallel reduction(+:tot_u) proc_bind(master)
     {
         unsigned x_e,x_w,y_n,y_s;
         float tot_u_thread = 0.0;
         float local_density = 0.0;
         float t[NSPEEDS];
         float u[5];
-        // float u_sq;
-        // short kk;
-        // float d_equ;
         unsigned ii, ri, rj;
         if(*(heights + 3) == 1) {
             #pragma omp for schedule(auto)
@@ -156,21 +132,10 @@ int main(int argc, char* argv[])
                         x_e = rj + 1;
                         x_w = rj - 1;
                     }
-                    // *t = *(cells + ii);
-                    // *(t + 1) = *(cells + total_num   + ri*params.nx  + x_w);
                     *(t + 2) = *(cells + total_num*2 + y_s*params.nx + rj);
-                    // *(t + 3) = *(cells + total_num*3 + ri*params.nx  + x_e);
-                    // *(t + 4) = *(cells + total_num*4 + y_n*params.nx + rj);
                     *(t + 5) = *(cells + total_num*5 + y_s*params.nx + x_w);
                     *(t + 6) = *(cells + total_num*6 + y_s*params.nx + x_e);
-                    // *(t + 7) = *(cells + total_num*7 + y_n*params.nx + x_e);
-                    // *(t + 8) = *(cells + total_num*8 + y_n*params.nx + x_w);
-                    // *(tmp_cells + 1*total_num + ii) = *(t + 3);
-                    // *(tmp_cells + 2*total_num + ii) = *(t + 4);
-                    // *(tmp_cells + 3*total_num + ii) = *(t + 1);
                     *(tmp_cells + 4*total_num + ii) = *(t + 2);
-                    // *(tmp_cells + 5*total_num + ii) = *(t + 7);
-                    // *(tmp_cells + 6*total_num + ii) = *(t + 8);
                     *(tmp_cells + 7*total_num + ii) = *(t + 5);
                     *(tmp_cells + 8*total_num + ii) = *(t + 6);
                 }
@@ -184,7 +149,6 @@ int main(int argc, char* argv[])
                     ri = 0;
                     rj = ii;
                     y_s = ri + params.ny - 1;
-                    // y_n = ri + 1;
                     if (rj == 0 ) {
                         x_w = rj + params.nx - 1;
                         x_e = rj + 1;
@@ -195,29 +159,17 @@ int main(int argc, char* argv[])
                         x_e = rj + 1;
                         x_w = rj - 1;
                     }
-                    // *t = *(cells + ii);
-                    // *(t + 1) = *(cells + total_num   + ri*params.nx  + x_w);
-                    // *(t + 2) = *(cells + total_num*2 + y_s*params.nx + rj);
-                    // *(t + 3) = *(cells + total_num*3 + ri*params.nx  + x_e);
                     *(t + 4) = *(cells + total_num*4 + y_n*params.nx + rj);
-                    // *(t + 5) = *(cells + total_num*5 + y_s*params.nx + x_w);
-                    // *(t + 6) = *(cells + total_num*6 + y_s*params.nx + x_e);
                     *(t + 7) = *(cells + total_num*7 + y_n*params.nx + x_e);
                     *(t + 8) = *(cells + total_num*8 + y_n*params.nx + x_w);
-                    // *(tmp_cells + 1*total_num + ii) = *(t + 3);
                     *(tmp_cells + 2*total_num + ii) = *(t + 4);
-                    // *(tmp_cells + 3*total_num + ii) = *(t + 1);
-                    // *(tmp_cells + 4*total_num + ii) = *(t + 2);
                     *(tmp_cells + 5*total_num + ii) = *(t + 7);
                     *(tmp_cells + 6*total_num + ii) = *(t + 8);
-                    // *(tmp_cells + 7*total_num + ii) = *(t + 5);
-                    // *(tmp_cells + 8*total_num + ii) = *(t + 6);
                 }
         }
         #pragma omp for schedule(auto)
             for (ii = *heights*params.nx; ii < *(heights + 1)*params.nx; ii++) 
-            {
-                // printf("%d .... %d \n", omp_get_thread_num(), ii);
+            {                
                 ri = ii/params.nx;
                 rj = ii%params.nx;
                 if (ri == 0) {
@@ -260,13 +212,8 @@ int main(int argc, char* argv[])
                     *(tmp_cells + 8*total_num + ii) = *(t + 6);
                 } else {
                     
-		    local_density = *t + *(t + 1) + *(t + 2) + *(t + 3) + *(t + 4) + *(t + 5) + *(t + 6) + *(t + 7) + *(t + 8);
-                    //local_density = 0.0;
-
-                    //for (kk = 0; kk < NSPEEDS; kk++)
-                    //{
-                    //    local_density += *(t + kk);
-                    //}
+		    local_density = *t + *(t + 1) + *(t + 2) + *(t + 3) + *(t + 4) + *(t + 5) + *(t + 6) + *(t + 7) + *(t + 8);                    
+                                                                                
 
                     /* compute x velocity component */
                     *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7)))/local_density;
@@ -275,13 +222,7 @@ int main(int argc, char* argv[])
                     *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8)))/local_density;
 
                     /* velocity squared */
-                    *u = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);
-                    // *(u + 3) = - *(u + 1);        /* west */
-                    // *(u + 4) =        - *(u + 2);  /* south */
-                    // *(u + 5) =   *(u + 1) + *(u + 2);  /* north-east */
-                    // *(u + 6) = - *(u + 1) + *(u + 2);  /* north-west */
-                    // *(u + 7) = - *(u + 1) - *(u + 2);  /* south-west */
-                    // *(u + 8) =   *(u + 1) - *(u + 2);  /* south-east */
+                    *u = *(u + 1) * *(u + 1) + *(u + 2) * *(u + 2);                                                                                                                        
                     *(u + 3) = *(u + 1) + *(u + 2);
                     *(u + 4) = -*(u + 1) + *(u + 2);
                     *(tmp_cells + ii) = (*t + params.omega * ((w0 * local_density - local_density*(2.0**u) / (3.0)) - *t));
@@ -301,15 +242,6 @@ int main(int argc, char* argv[])
                             +(4.5**(u + 3)**(u + 3) - 1.5**u))) - *(t + 7)));
                     *(tmp_cells + 8*total_num + ii) = (*(t + 8) + params.omega * ((*(w + 1) * local_density * (one - (3.0**(u + 4))
                             +(4.5**(u + 4)**(u + 4) - 1.5**u))) - *(t + 8)));
-                    // d_equ = w0 * local_density - local_density*(2.0*u_sq) / (3.0);
-                    /* relaxation step */
-                    // *(tmp_cells + ii) = (*t + params.omega * (d_equ - *t));
-                    // for (kk = 1; kk < NSPEEDS; kk++)
-                    // {
-                    //     d_equ = *(w + (kk-1)/4) * local_density * (one + (3.0**(u + kk))
-                    //         +(9.0**(u + kk)**(u + kk) - 3.0*u_sq) / 2.0);
-                    //     *(tmp_cells + kk*total_num + ii) = (*(t + kk) + params.omega * (d_equ - *(t + kk)));
-                    // }
                     tot_u_thread = tot_u_thread + sqrt(*u);  
                     if (accel_area.col_or_row == ACCEL_COLUMN && rj == accel_area.idx) {
                         /* if the cell is not occupied and
@@ -433,56 +365,6 @@ void write_values(const char * final_state_file, const char * av_vels_file,
         fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %u\n",
             ii%params.nx,ii/params.nx,u_x,u_y,u,pressure,obstacles[ii]);
     }
-    // for (ii = 0; ii < params.ny; ii++)
-    // {
-    //     for (jj = 0; jj < params.nx; jj++)
-    //     {
-    //         /* an occupied cell */
-    //         if (obstacles[ii*params.nx + jj])
-    //         {
-    //             u_x = u_y = u = 0.0;
-    //             pressure = params.density * c_sq;
-    //         }
-    //         /* no obstacle */
-    //         else
-    //         {
-    //             local_density = 0.0;
-
-    //             for (kk = 0; kk < NSPEEDS; kk++)
-    //             {
-    //                 local_density += cells[ii*params.nx + jj].speeds[kk];
-    //             }
-
-    //             /* compute x velocity component */
-    //             u_x = (cells[ii*params.nx + jj].speeds[1] +
-    //                     cells[ii*params.nx + jj].speeds[5] +
-    //                     cells[ii*params.nx + jj].speeds[8]
-    //                 - (cells[ii*params.nx + jj].speeds[3] +
-    //                     cells[ii*params.nx + jj].speeds[6] +
-    //                     cells[ii*params.nx + jj].speeds[7]))
-    //                 / local_density;
-
-    //             /* compute y velocity component */
-    //             u_y = (cells[ii*params.nx + jj].speeds[2] +
-    //                     cells[ii*params.nx + jj].speeds[5] +
-    //                     cells[ii*params.nx + jj].speeds[6]
-    //                 - (cells[ii*params.nx + jj].speeds[4] +
-    //                     cells[ii*params.nx + jj].speeds[7] +
-    //                     cells[ii*params.nx + jj].speeds[8]))
-    //                 / local_density;
-
-    //             /* compute norm of velocity */
-    //             u = sqrt((u_x * u_x) + (u_y * u_y));
-
-    //             /* compute pressure */
-    //             pressure = local_density * c_sq;
-    //         }
-
-    //         /* write to file */
-    //         fprintf(fp,"%d %d %.12E %.12E %.12E %.12E %d\n",
-    //             jj,ii,u_x,u_y,u,pressure,obstacles[ii*params.nx + jj]);
-    //     }
-    // }
 
     fclose(fp);
 

@@ -200,37 +200,14 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     #pragma omp parallel for
         for (ii = 0; ii< (params->ny*params->nx); ii++) {
             (*cells_ptr)[ii] = w0;	
-            //(*tmp_cells_ptr)[ii] = w0;
             (*obstacles_ptr)[ii] = 0;
         }
     for (ii = (params->ny*params->nx); ii < (params->ny*params->nx*5); ii++) {
         (*cells_ptr)[ii] = w1;
-        //(*tmp_cells_ptr)[ii] = w1;
     }
     for (ii = (params->ny*params->nx*5); ii < (params->ny*params->nx*9); ii++) {
         (*cells_ptr)[ii] = w2;
-        //(*tmp_cells_ptr)[ii] = w2;
     }
-    // for (ii = 0; ii < params->ny; ii++)
-    // {
-    //     for (jj = 0; jj < params->nx; jj++)
-    //     {
-    //         /* centre */
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[0] = w0;
-    //         /* axis directions */
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[1] = w1;
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[2] = w1;
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[3] = w1;
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[4] = w1;
-    //         /* diagonals */
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[5] = w2;
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[6] = w2;
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[7] = w2;
-    //         (*cells_ptr)[ii*params->nx + jj].speeds[8] = w2;
-
-    //         (*obstacles_ptr)[ii*params->nx + jj] = 0;
-    //     }
-    // }
 
     *total_cells = params->ny * params->nx;
     heights_ptr[0] = heights_ptr[1] = heights_ptr[2] = heights_ptr[3] = 0;
