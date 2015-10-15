@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<bag xmlns:int="http://www.w3.org/2001/XMLSchema#int" int:version="7" int:type="2">
+ <dbEntry key="GROUP_DEF(type:1 cpu_data /cpu_data::dd_sample.callsite.bottom_user_cs.code_loc.mod_seg.mod_file/cpu_data::dd_sample.callsite.type_cs.code_loc.func_range.func_inst.function.type/dd_band::dd_thread/dd_band::dd_thread.process)" value="3cfc-ea55-4c80-21c9"/>
+ <dbEntry key="GROUP_DEF(type:2 barrier_data )" value="3f4f-0821-ddf8-d313"/>
+ <dbEntry key="GROUP_DEF(type:2 region_data )" value="9e63-a356-d461-28e6"/>
+</bag>

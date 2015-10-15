@@ -198,16 +198,16 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     /* Initialise arrays */
     for (ii = 0; ii< (params->ny*params->nx); ii++) {
         (*cells_ptr)[ii] = w0;	
-        (*tmp_cells_ptr)[ii] = w0;
+        //(*tmp_cells_ptr)[ii] = w0;
         (*obstacles_ptr)[ii] = 0;
     }
     for (ii = (params->ny*params->nx); ii < (params->ny*params->nx*5); ii++) {
         (*cells_ptr)[ii] = w1;
-        (*tmp_cells_ptr)[ii] = w1;
+        //(*tmp_cells_ptr)[ii] = w1;
     }
     for (ii = (params->ny*params->nx*5); ii < (params->ny*params->nx*9); ii++) {
         (*cells_ptr)[ii] = w2;
-        (*tmp_cells_ptr)[ii] = w2;
+        //(*tmp_cells_ptr)[ii] = w2;
     }
     // for (ii = 0; ii < params->ny; ii++)
     // {
@@ -231,8 +231,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     // }
 
     *total_cells = params->ny * params->nx;
-    heights_ptr[0] = params -> nx - 1;
-    heights_ptr[1] = heights_ptr[2] = heights_ptr[3] = 0;
+    heights_ptr[0] = heights_ptr[1] = heights_ptr[2] = heights_ptr[3] = 0;
     int first_obst = 0;
     /* Fill in locations of obstacles */
     for (ii = 0; ii < params->ny; ii++)
@@ -258,14 +257,16 @@ void initialise(const char* param_file, accel_area_t * accel_area,
             if (obst == 0) {
                 if ( first_obst == 0 ) {
                     first_obst = 1;
-                    heights_ptr[1] = ii;
+                    heights_ptr[0] = ii;
                 }
-                heights_ptr[3] = ii;
-                if ( jj <= heights_ptr[0]) heights_ptr[0] = jj;
-                if ( jj >= heights_ptr[2]) heights_ptr[2] = jj;
+                heights_ptr[1] = ii + 1;
             }
         }
     }
+    if(heights_ptr[0] != 0)  heights_ptr[0] -= 1;
+    else heights_ptr[2] = 1;
+    if (heights_ptr[1] != params->nx) heights_ptr[1] += 1;
+    else heights_ptr[3] = 1;
     free(obstacles);
 }
 

@@ -1,8 +1,8 @@
 CC=icc
 #CC=gcc
 #CFLAGS=-O3 -fopenmp
-CFLAGS= -O3 -no-prec-div -ipo -xHOST -qopenmp -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
-
+CFLAGS= -O3 -no-prec-div -ipo -xHOST -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
+CEXT=
 EXE=lbm
 
 PARAM_FILE=../inputs/box.params
@@ -20,10 +20,10 @@ SUBMIT_FILES=Makefile lbm.c lbm.h simulation.c utils.c
 ENV_SCRIPT=env.sh
 
 $(EXE) : utils.o lbm.o simulation.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) $(CEXT) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 %.o: %.c Makefile lbm.h
-	$(CC) $(CFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS) $(CEXT) -o $@ -c $<
 
 run: $(EXE)
 	./$(EXE) -a $(AV_VELS_FILE) -f $(FINAL_STATE_FILE) -p $(PARAM_FILE)

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <getopt.h>
+#include <omp.h>
 
 #include "lbm.h"
 
@@ -196,11 +197,12 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     w2 = params->density      /36.0;
 
     /* Initialise arrays */
-    for (ii = 0; ii< (params->ny*params->nx); ii++) {
-        (*cells_ptr)[ii] = w0;	
-        //(*tmp_cells_ptr)[ii] = w0;
-        (*obstacles_ptr)[ii] = 0;
-    }
+    #pragma omp parallel for
+        for (ii = 0; ii< (params->ny*params->nx); ii++) {
+            (*cells_ptr)[ii] = w0;	
+            //(*tmp_cells_ptr)[ii] = w0;
+            (*obstacles_ptr)[ii] = 0;
+        }
     for (ii = (params->ny*params->nx); ii < (params->ny*params->nx*5); ii++) {
         (*cells_ptr)[ii] = w1;
         //(*tmp_cells_ptr)[ii] = w1;
@@ -279,4 +281,5 @@ void finalise(float** cells_ptr, float** tmp_cells_ptr,
     free(*obstacles_ptr);
     free(*av_vels_ptr);
 }
+
 

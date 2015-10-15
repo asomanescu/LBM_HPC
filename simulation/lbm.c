@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
         short kk;
         float d_equ;
         unsigned ii, ri, rj;
-        if(heights[3] == 1) {
+        if(*(heights + 3) == 1) {
             #pragma omp for schedule(auto)
                 for (ii = 0; ii< params.nx; ii++) {
                     ri = params.ny - 1;
@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
                     *(tmp_cells + 8*total_num + ii) = *(t + 6);
                 }
         }
-        if (heights[2] == 1)
+        if (*(heights + 2) == 1)
         {
             #pragma omp for schedule(auto)
                 for (ii = params.nx*(params.ny - 1); ii< total_num; ii++)
@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
                 }
         }
         #pragma omp for schedule(auto)
-            for (ii = heights[0]*params.nx; ii < heights[1]*params.nx; ii++) 
+            for (ii = *heights*params.nx; ii < *(heights + 1)*params.nx; ii++) 
             {
                 // printf("%d .... %d \n", omp_get_thread_num(), ii);
                 ri = ii/params.nx;
@@ -507,4 +507,5 @@ float total_density(const param_t params, speed_t* cells)
 
     return total;
 }
+
 
