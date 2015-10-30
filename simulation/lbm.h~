@@ -35,9 +35,9 @@ typedef struct {
     float *spd;
 } speed_t2;
 
-typedef enum { ACCEL_ROW, ACCEL_COLUMN } accel_e;
+typedef enum { 1, 0 } accel_e;
 typedef struct {
-    accel_e col_or_row;
+    unsigned col_or_row;
     int idx;
 } accel_area_t;
 
@@ -47,7 +47,7 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* paramfile, accel_area_t * accel_area,
     param_t* params, float** cells_ptr, float** tmp_cells_ptr,
-    unsigned char** obstacles_ptr, float** av_vels_ptr, unsigned* total_cells);
+    unsigned char** obstacles_ptr, float** av_vels_ptr, unsigned* total_cells, unsigned *heights_ptr);
 
 void write_values(const char * final_state_file, const char * av_vels_file,
     const param_t params, float* cells, unsigned char* obstacles, float* av_vels, unsigned total_cells);
@@ -68,7 +68,7 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
 float total_density(const param_t params, speed_t* cells);
 
 /* compute average velocity */
-float av_velocity(const param_t params, float* cells, unsigned* obstacles);
+float av_velocity(const param_t params, float* cells, unsigned char* obstacles);
 
 /* calculate Reynolds number */
 float calc_reynolds(const param_t params, float* cells, unsigned char* obstacles);

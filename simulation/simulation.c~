@@ -1,3 +1,7 @@
+/* THE ONLY THING THAT IS USED IN THIS FILE IS THE AV_VELOCITY FUNCTION*/
+
+
+
 /* Functions pertinent to the outer simulation steps */
 
 #include <math.h>
@@ -242,7 +246,7 @@ float collision(const param_t params, float* cells, float* tmp_cells, int* obsta
     return tot_u / (float)total_cells;
 }
 
-float av_velocity(const param_t params, float* cells, unsigned* obstacles)
+float av_velocity(const param_t params, float* cells, unsigned char* obstacles)
 {
     int    ii,kk;       /* generic counters */
     int    tot_cells = 0;  /* no. of cells used in calculation */

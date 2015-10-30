@@ -35,9 +35,9 @@ typedef struct {
     float *spd;
 } speed_t2;
 
-typedef enum { ACCEL_ROW, ACCEL_COLUMN } accel_e;
+//typedef enum { 1, 0 } accel_e;
 typedef struct {
-    accel_e col_or_row;
+    unsigned col_or_row;
     int idx;
 } accel_area_t;
 

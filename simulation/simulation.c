@@ -28,7 +28,7 @@ void accelerate_flow(const param_t params, const accel_area_t accel_area,
     w1 = params.density * params.accel / 9.0;
     w2 = params.density * params.accel / 36.0;
 
-    if (accel_area.col_or_row == ACCEL_COLUMN)
+    //if (accel_area.col_or_row == ACCEL_COLUMN)
     {
         // jj = accel_area.idx;
         // for (ii = 0; ii < params.ny; ii++)
@@ -51,7 +51,7 @@ void accelerate_flow(const param_t params, const accel_area_t accel_area,
         //     }
         // }
     }
-    else
+    //else
     {
         // Know where to start from
         ii = accel_area.idx * params.nx;

@@ -143,12 +143,12 @@ void initialise(const char* param_file, accel_area_t * accel_area,
 
     if (!(strcmp(accel_dir_buf, "row")))
     {
-        accel_area->col_or_row = ACCEL_ROW;
+        accel_area->col_or_row = 1;
         accel_area->idx = idx*(params->ny/BOX_Y_SIZE);
     }
     else if (!(strcmp(accel_dir_buf, "column")))
     {
-        accel_area->col_or_row = ACCEL_COLUMN;
+        accel_area->col_or_row = 0;
         accel_area->idx = idx*(params->nx/BOX_X_SIZE);
     }
     else
@@ -229,6 +229,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos <  obstacles[kk].obs_y_max)
                 {
                     (*obstacles_ptr)[ii*params->nx + jj] = 1;
+		    (*cells_ptr)[ii*params->nx + jj] = -1;	
                     *total_cells = *total_cells - 1;
                     obst = 1;
                 }
