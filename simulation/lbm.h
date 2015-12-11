@@ -7,6 +7,8 @@
 #define BOX_X_SIZE (100.0)
 #define BOX_Y_SIZE (100.0)
 
+#include "mpi.h"
+
 /* struct to hold the parameter values */
 typedef struct {
     int nx;            /* no. of cells in x-direction */
@@ -33,7 +35,7 @@ typedef struct {
 
 typedef enum { ACCEL_ROW, ACCEL_COLUMN } accel_e;
 typedef struct {
-    accel_e col_or_row;
+    int col_or_row;
     int idx;
 } accel_area_t;
 
@@ -43,10 +45,10 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* paramfile, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr);
+    int** obstacles_ptr, float** av_vels_ptr, unsigned *total_cells, unsigned *heights_ptr);
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels);
+    const param_t params, speed_t* cells, int* obstacles, float* av_vels, unsigned total_cells);
 
 void finalise(speed_t** cells_ptr, speed_t** tmp_cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr);
@@ -67,7 +69,7 @@ float total_density(const param_t params, speed_t* cells);
 float av_velocity(const param_t params, speed_t* cells, int* obstacles);
 
 /* calculate Reynolds number */
-float calc_reynolds(const param_t params, speed_t* cells, int* obstacles);
+float calc_reynolds(const param_t params, float av_vel, unsigned total_cells);
 
 /* Exit, printing out formatted string */
 #define DIE(...) exit_with_error(__LINE__, __FILE__, __VA_ARGS__)

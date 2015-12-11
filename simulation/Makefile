@@ -1,16 +1,18 @@
-CC=gcc
+CC=mpicc
 
-CFLAGS=-O3 -g -Wall
+CFLAGS=-O3
 
 EXE=lbm
+
+USER_NAME=as13118
 
 PARAM_FILE=../inputs/box.params
 
 FINAL_STATE_FILE=./final_state.dat
 AV_VELS_FILE=./av_vels.dat
 
-REF_FINAL_STATE_FILE=../check/box.final_state.dat
-REF_AV_VELS_FILE=../check/box.av_vels.dat
+REF_FINAL_STATE_FILE=../check/large_pipe.final_state.dat
+REF_AV_VELS_FILE=../check/large_pipe.av_vels.dat
 
 LDLIBS=-lm
 
@@ -32,6 +34,12 @@ plot:
 
 check:
 	python ../check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) --ref-final-state-file=$(REF_FINAL_STATE_FILE) --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
+
+sub: $(EXE)
+	qsub lbm_job_submit
+
+s:
+	watch qstat -u $(USER_NAME)
 
 submission:
 	@if [ -e $(SUBMIT_DIR) ] ; \
@@ -57,4 +65,5 @@ submission:
 .PHONY: clean submission
 clean:
 	rm -f *.o $(EXE)
+	rm -f MPI.e* machine.file.* lbm.80s* *~
 

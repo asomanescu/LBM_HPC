@@ -1,0 +1,14 @@
+Running on host node31-030
+Time is Wed Dec 9 11:52:15 GMT 2015
+Directory is /panfs/panasas01/cosc/as13118/LBM_HPC/simulation
+PBS job ID is 3786215.master.cm.cluster
+This jobs runs on the following machines:
+node31-030
+./lbm -a ./av_vels.dat -f ./final_state.dat -p ../inputs/large_pipe.params
+./lbm -a ./av_vels.dat -f ./final_state.dat -p ../inputs/large_pipe.params
+./lbm -a ./av_vels.dat -f ./final_state.dat -p ../inputs/large_pipe.params
+./lbm -a ./av_vels.dat -f ./final_state.dat -p ../inputs/large_pipe.params
+Hello, world; from host node31-030: process 0 of 1
+Hello, world; from host node31-030: process 0 of 1
+Hello, world; from host node31-030: process 0 of 1
+Hello, world; from host node31-030: process 0 of 1

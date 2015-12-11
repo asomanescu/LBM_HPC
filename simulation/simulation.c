@@ -239,7 +239,7 @@ float av_velocity(const param_t params, speed_t* cells, int* obstacles)
     for (ii = 0; ii < params.ny * params.nx; ii++)
     {
         /* ignore occupied cells */
-        if (!obstacles[ii])
+        if (cells[ii].speeds[0] != -1)
         {
             /* local density total */
             local_density = 0.0;

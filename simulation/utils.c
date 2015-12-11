@@ -96,7 +96,7 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* param_file, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr)
+    int** obstacles_ptr, float** av_vels_ptr, unsigned *total_cells, unsigned *heights_ptr)
 {
     FILE   *fp;            /* file pointer */
     int    ii,jj, kk;          /* generic counters */
@@ -142,12 +142,12 @@ void initialise(const char* param_file, accel_area_t * accel_area,
 
     if (!(strcmp(accel_dir_buf, "row")))
     {
-        accel_area->col_or_row = ACCEL_ROW;
+        accel_area->col_or_row = 0;
         accel_area->idx = idx*(params->ny/BOX_Y_SIZE);
     }
     else if (!(strcmp(accel_dir_buf, "column")))
     {
-        accel_area->col_or_row = ACCEL_COLUMN;
+        accel_area->col_or_row = 1;
         accel_area->idx = idx*(params->nx/BOX_X_SIZE);
     }
     else
@@ -217,6 +217,9 @@ void initialise(const char* param_file, accel_area_t * accel_area,
         }
     }
 
+    *total_cells = params->ny * params->nx;
+    heights_ptr[0] = 0;
+    int first_obst = 0;
     /* Fill in locations of obstacles */
     for (ii = 0; ii < params->ny; ii++)
     {
@@ -226,6 +229,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
             const float x_pos = jj*(BOX_X_SIZE/params->nx);
             const float y_pos = ii*(BOX_Y_SIZE/params->ny);
 
+            int obst = 0;
             for (kk = 0; kk < n_obstacles; kk++)
             {
                 if (x_pos >= obstacles[kk].obs_x_min &&
@@ -233,12 +237,79 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos >= obstacles[kk].obs_y_min &&
                     y_pos <  obstacles[kk].obs_y_max)
                 {
-                    (*obstacles_ptr)[ii*params->nx + jj] = 1;
+                    // (*obstacles_ptr)[ii*params->nx + jj] = 1;
+                    (*cells_ptr)[ii*params->nx + jj].speeds[0] = -1;
+                    *total_cells = *total_cells - 1;
+                    obst = 1;
                 }
+            }
+            if (obst == 0) {
+                if ( first_obst == 0 ) {
+                    first_obst = 1;
+                    heights_ptr[0] = ii;
+                }
+                heights_ptr[1] = ii + 1;
             }
         }
     }
 
+    if(heights_ptr[0] != 0)  heights_ptr[0] -= 1;
+    else heights_ptr[1] = params->nx;
+    if(heights_ptr[1] != params->nx) heights_ptr[1] += 1;
+    else heights_ptr[0] = 0;
+
+
+    float wx1 = params->density * params->accel / 9.0;
+    float wx2 = params->density * params->accel / 36.0;
+
+    if (accel_area->col_or_row == ACCEL_COLUMN)
+    {
+        jj = accel_area->idx;
+
+        for (ii = 0; ii < params->ny; ii++)
+        {
+            /* if the cell is not occupied and
+            ** we don't send a density negative */
+            if ((*cells_ptr)[ii*params->nx + jj].speeds[0] != -1 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[4] - wx1) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[7] - wx2) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[8] - wx2) > 0.0 )
+            {
+                /* increase 'north-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[2] += wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[5] += wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[6] += wx2;
+                /* decrease 'south-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[4] -= wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[7] -= wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[8] -= wx2;
+            }
+        }
+    }
+    else
+    {
+        ii = accel_area->idx;
+
+        for (jj = 0; jj < params->nx; jj++)
+        {
+            /* if the cell is not occupied and
+            ** we don't send a density negative */
+            if ((*cells_ptr)[ii*params->nx + jj].speeds[0] != -1 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[3] - wx1) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[6] - wx2) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[7] - wx2) > 0.0 )
+            {
+                /* increase 'east-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[1] += wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[5] += wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[8] += wx2;
+                /* decrease 'west-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[3] -= wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[6] -= wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[7] -= wx2;
+            }
+        }
+    }
     free(obstacles);
 }
 
