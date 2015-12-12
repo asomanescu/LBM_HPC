@@ -1,6 +1,6 @@
 CC=mpicc
 
-CFLAGS=-O3
+CFLAGS=-O3 -fopenmp
 
 EXE=lbm
 

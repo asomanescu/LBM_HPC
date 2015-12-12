@@ -55,6 +55,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <omp.h>
 
 #include "lbm.h"
 
@@ -184,13 +185,15 @@ int main(int argc, char* argv[]) {
   speed_t* local_tmp_cells = (speed_t *) malloc(sizeof(speed_t)*local_gsz);
   MPI_Scatterv(cells, gsz_count, gsz_disp, MPI_SPEED, local_cells, local_gsz, MPI_SPEED, MASTER, MPI_COMM_WORLD);
   // MPI_Scatterv(cells, gsz_count, gsz_disp, MPI_SPEED, local_tmp_cells, local_gsz, MPI_SPEED, MASTER, MPI_COMM_WORLD);
+  // MPI_Info info;
   speed_t* hallo_1 = (speed_t *)malloc(sizeof(speed_t)*params.nx);
+  // MPI_Alloc_mem(sizeof(speed_t)*params.nx, info, hallo_1);
   speed_t* hallo_2 = (speed_t *)malloc(sizeof(speed_t)*params.nx);
   float *local_av_vels = (float *)malloc(sizeof(float)*params.max_iters);
   float tot_u;
   unsigned x_e,x_w,y_n,y_s;
   float local_density = 0.0;
-  float t[NSPEEDS];
+  // float t[NSPEEDS];
   float u[5];
   const unsigned rank_b = ( rank != 0 ) ? (rank - 1) : (size - 1);
   const unsigned rank_t = ( rank != size - 1) ? ( rank + 1 ) : 0;
@@ -203,8 +206,6 @@ int main(int argc, char* argv[]) {
   const float omega = params.omega;
   const float minus_omega = 1.0f - omega;
   accel_area.idx = (accel_area.col_or_row == 0) ? accel_area.idx * nx - gsz_disp[rank] : accel_area.idx;
-
-
 
 
 //   // 0.044444 0.011111 0.002778
@@ -238,6 +239,12 @@ int main(int argc, char* argv[]) {
     //   // MPI_Ssend(local_cells, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD);
     // }
   //   // printf("Iter %d on process %d\n", iii, rank);
+  omp_set_nested(0);
+  #pragma omp parallel reduction(+:tot_u) private(ii, local_density, u, ri, rj, y_s, y_n, x_w, x_e)
+  {
+    float tot_u_thread = 0.0;
+    float t[NSPEEDS]; 
+    #pragma omp for schedule(auto)
     for(ii = nx; ii < local_gsz - nx; ii++) {
       ri = ii/nx;
       ri = ri * nx;
@@ -248,7 +255,7 @@ int main(int argc, char* argv[]) {
       x_w = (rj != 0) ? (rj - 1) : (nx - 1);
       x_e = (rj != nx - 1) ? (rj + 1) : 0;
 
-      float t[NSPEEDS]; //local_cells[ii];
+      // float t[NSPEEDS]; //local_cells[ii];
 
       *t = local_cells[ii].speeds[0];
       *(t + 1) = local_cells[ri + x_w].speeds[1];
@@ -275,7 +282,7 @@ int main(int argc, char* argv[]) {
         *(u + 3) = *(u + 1) + *(u + 2);
         *(u + 4) = -*(u + 1) + *(u + 2);
 
-        tot_u += sqrt(*u);
+        tot_u_thread = tot_u_thread + sqrt(*u);
 
         *u = 1.0f - 1.5f**u;
         local_density = 0.4444444f*local_density*omega;
@@ -335,6 +342,8 @@ int main(int argc, char* argv[]) {
       local_tmp_cells[ii].speeds[8] = (t[0] == -1) ? t[6] : t[8];
       // local_tmp_cells[ii] = t_to_send;
     }
+    tot_u = tot_u + tot_u_thread;
+  }
 
     MPI_Wait(&send_up_req, &send_up_status);
     MPI_Wait(&recv_up_req, &recv_up_status);
@@ -535,6 +544,49 @@ int main(int argc, char* argv[]) {
       local_tmp_cells[ii].speeds[8] = (t[0] == -1) ? t[6] : t[8];
       // local_tmp_cells[ii] = t_to_send;
     }
+    // if ( accel_area.col_or_row ) {
+    //   int rj = accel_area.idx;
+    //   for( ii = 0; ii < local_gsz/nx; ii++) {
+    //     if (
+    //     (local_tmp_cells[ii*nx + rj].speeds[0] != -1) &&
+    //     (local_tmp_cells[ii*nx + rj].speeds[4] - w1) > 0.0 &&
+    //     (local_tmp_cells[ii*nx + rj].speeds[7] - w2) > 0.0 &&
+    //     (local_tmp_cells[ii*nx + rj].speeds[8] - w2) > 0.0 )
+    //     {
+    //        // increase 'north-side' densities 
+    //       local_tmp_cells[ii*nx + rj].speeds[2] += w1;
+    //       local_tmp_cells[ii*nx + rj].speeds[5] += w2;
+    //       local_tmp_cells[ii*nx + rj].speeds[6] += w2;
+    //       /* decrease 'south-side' densities */
+    //       local_tmp_cells[ii*nx + rj].speeds[4] -= w1;
+    //       local_tmp_cells[ii*nx + rj].speeds[7] -= w2;
+    //       local_tmp_cells[ii*nx + rj].speeds[8] -= w2;
+    //     }
+    //   }
+    // } else {
+    //   int ri = accel_area.idx;
+    //   // printf("%d with rank %d and displ %d and local %d \n", ri, rank, gsz_disp[rank], local_gsz);
+    //   if( ri > 0 && ri < local_gsz) {
+    //     for ( ii = 0; ii < nx; ii++) {
+    //       if (
+    //         (local_tmp_cells[ii + ri].speeds[0] != -1) &&
+    //         (local_tmp_cells[ii + ri].speeds[3] - w1) > 0.0 &&
+    //         (local_tmp_cells[ii + ri].speeds[6] - w2) > 0.0 &&
+    //         (local_tmp_cells[ii + ri].speeds[7] - w2) > 0.0 )
+    //         {
+    //           /* increase 'east-side' densities */
+    //           local_tmp_cells[ii + ri].speeds[1] += w1;
+    //           local_tmp_cells[ii + ri].speeds[5] += w2;
+    //           local_tmp_cells[ii + ri].speeds[8] += w2;
+    //           /* decrease 'west-side' densities */
+    //           local_tmp_cells[ii + ri].speeds[3] -= w1;
+    //           local_tmp_cells[ii + ri].speeds[6] -= w2;
+    //           local_tmp_cells[ii + ri].speeds[7] -= w2;
+    //         }
+    //     }
+        
+    //   }
+    // }
   //     // timestep(params, accel_area, cells, tmp_cells, obstacles);
     local_av_vels[iii] = tot_u; //av_velocity(params, cells, obstacles);
     swap_cells(&local_cells, &local_tmp_cells);
