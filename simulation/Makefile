@@ -1,6 +1,6 @@
 CC=mpicc
 
-CFLAGS=-O3
+CFLAGS=-O3 -no-prec-div -ipo -xHOST -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
 
 EXE=lbm
 

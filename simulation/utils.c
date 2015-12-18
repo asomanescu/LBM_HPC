@@ -253,10 +253,15 @@ void initialise(const char* param_file, accel_area_t * accel_area,
         }
     }
 
+    // printf("%d %d %d \n", heights_ptr[1], heights_ptr[0], heights_ptr[1] - heights_ptr[0]);
+
     if(heights_ptr[0] != 0)  heights_ptr[0] -= 1;
-    else heights_ptr[1] = params->nx;
-    if(heights_ptr[1] != params->nx) heights_ptr[1] += 1;
+    else heights_ptr[1] = params->ny;
+    if(heights_ptr[1] != params->ny) heights_ptr[1] += 1;
     else heights_ptr[0] = 0;
+
+    //heights_ptr[0] = 0;
+    //heights_ptr[1] = params->ny;
 
 
     float wx1 = params->density * params->accel / 9.0;

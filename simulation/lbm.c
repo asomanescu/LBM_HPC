@@ -189,7 +189,7 @@ int main(int argc, char* argv[]) {
   float *local_av_vels = (float *)malloc(sizeof(float)*params.max_iters);
   float tot_u;
   unsigned x_e,x_w,y_n,y_s;
-  float local_density = 0.0;
+  float local_density = 0.0f;
   float t[NSPEEDS];
   float u[5];
   const unsigned rank_b = ( rank != 0 ) ? (rank - 1) : (size - 1);
@@ -200,8 +200,8 @@ int main(int argc, char* argv[]) {
   const float w2 = params.density * params.accel * w[1];
   unsigned iii, ii, ri, rj;
   const unsigned nx = params.nx;
-  const float omega = params.omega;
-  const float minus_omega = 1.0f - omega;
+  const float omega = w0*params.omega;
+  const float minus_omega = 1.0f - params.omega;
   accel_area.idx = (accel_area.col_or_row == 0) ? accel_area.idx * nx - gsz_disp[rank] : accel_area.idx;
 
 
@@ -225,17 +225,17 @@ int main(int argc, char* argv[]) {
     MPI_Irecv(hallo_2, nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD, &recv_down_req);
     MPI_Irecv(hallo_1, nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &recv_up_req);
     // if ( rank % 2 == 0 ) {
-    //   // MPI_Ssend(local_cells, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD);
-    //   // MPI_Recv(hallo_2, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD, &status);
-    //   // MPI_Ssend(&local_cells[local_gsz - params.nx], params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD);
-    //   // MPI_Recv(hallo_1, params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &status);
+    //   MPI_Ssend(local_cells, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD);
+    //   MPI_Recv(hallo_2, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD, &status);
+    //   MPI_Ssend(&local_cells[local_gsz - params.nx], params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD);
+    //   MPI_Recv(hallo_1, params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &status);
     // } else {
-    //   MPI_Irecv(hallo_1, nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &req);
-    //   MPI_Wait(&req, &status);
-    //   // MPI_Recv(hallo_1, params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &status);
-    //   // MPI_Ssend(&local_cells[local_gsz - params.nx], params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD);
-    //   // MPI_Recv(hallo_2, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD, &status);
-    //   // MPI_Ssend(local_cells, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD);
+    //   // MPI_Irecv(hallo_1, nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &req);
+    //   // MPI_Wait(&req, &status);
+    //   MPI_Recv(hallo_1, params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD, &status);
+    //   MPI_Ssend(&local_cells[local_gsz - params.nx], params.nx, MPI_SPEED, (size + rank + 1)%size, iii, MPI_COMM_WORLD);
+    //   MPI_Recv(hallo_2, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD, &status);
+    //   MPI_Ssend(local_cells, params.nx, MPI_SPEED, (size + rank - 1)%size, iii, MPI_COMM_WORLD);
     // }
   //   // printf("Iter %d on process %d\n", iii, rank);
     for(ii = nx; ii < local_gsz - nx; ii++) {
@@ -264,33 +264,33 @@ int main(int argc, char* argv[]) {
       //   printf("%d %d %d %f \n", ri, gsz_disp[rank] + ri, accel_area.idx*nx, t[0]);
       // }
       if(t[0] != -1) {
-        local_density = t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7] + t[8];
+        local_density = *(t + 0) + *(t + 1) + *(t + 2) + *(t + 3) + *(t + 4) + *(t + 5) + *(t + 6) + *(t + 7) + *(t + 8);
 
-        u[1] = (t[1] + t[5] + t[8] - (t[3] + t[6] + t[7])) / local_density;
+        *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7))) / local_density;
 
-        u[2] = (t[2] + t[5] + t[6] - (t[4] + t[7] + t[8])) / local_density;
+        *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8))) / local_density;
 
-        u[0] = u[1]*u[1] + u[2]*u[2];
+        *(u + 0) = *(u + 1)**(u + 1) + *(u + 2)**(u + 2);
 
         *(u + 3) = *(u + 1) + *(u + 2);
         *(u + 4) = -*(u + 1) + *(u + 2);
 
-        tot_u += sqrt(*u);
+        tot_u = (float) sqrt(*u) + tot_u;
 
         *u = 1.0f - 1.5f**u;
-        local_density = 0.4444444f*local_density*omega;
+        local_density = local_density*omega;
         // *u = local_density**u;
         t[0] = t[0] * minus_omega + local_density**u; 
         local_density *= 0.25f;
-        t[1] = t[1] * minus_omega + local_density * (u[0] + 4.5f * u[1] * u[1] + 3.0f * u[1]);
-        t[2] = t[2] * minus_omega + local_density * (u[0] + 4.5f * u[2] * u[2] + 3.0f * u[2]);
-        t[3] = t[3] * minus_omega + local_density * (u[0] + 4.5f * u[1] * u[1] - 3.0f * u[1]);
-        t[4] = t[4] * minus_omega + local_density * (u[0] + 4.5f * u[2] * u[2] - 3.0f * u[2]);
+        t[1] = t[1] * minus_omega + local_density * (u[0] +  4.50f * u[1] * u[1] + 3.0f * u[1]);
+        t[2] = t[2] * minus_omega + local_density * (u[0] +  4.50f * u[2] * u[2] + 3.0f * u[2]);
+        t[3] = t[3] * minus_omega + local_density * (u[0] +  4.50f * u[1] * u[1] - 3.0f * u[1]);
+        t[4] = t[4] * minus_omega + local_density * (u[0] +  4.50f * u[2] * u[2] - 3.0f * u[2]);
         local_density *= 0.25f;
-        t[5] = t[5] * minus_omega + local_density * (u[0] + 4.5f * u[3] * u[3] + 3.0f * u[3]);
-        t[6] = t[6] * minus_omega + local_density * (u[0] + 4.5f * u[4] * u[4] + 3.0f * u[4]);
-        t[7] = t[7] * minus_omega + local_density * (u[0] + 4.5f * u[3] * u[3] - 3.0f * u[3]);
-        t[8] = t[8] * minus_omega + local_density * (u[0] + 4.5f * u[4] * u[4] - 3.0f * u[4]);
+        t[5] = t[5] * minus_omega + local_density * (u[0] +  4.50f * u[3] * u[3] + 3.0f * u[3]);
+        t[6] = t[6] * minus_omega + local_density * (u[0] +  4.50f * u[4] * u[4] + 3.0f * u[4]);
+        t[7] = t[7] * minus_omega + local_density * (u[0] +  4.50f * u[3] * u[3] - 3.0f * u[3]);
+        t[8] = t[8] * minus_omega + local_density * (u[0] +  4.50f * u[4] * u[4] - 3.0f * u[4]);
         if (accel_area.col_or_row == 1 && rj == accel_area.idx) {
           if (
           (*(t + 4) - w1) > 0.0 &&
@@ -338,6 +338,8 @@ int main(int argc, char* argv[]) {
 
     MPI_Wait(&send_up_req, &send_up_status);
     MPI_Wait(&recv_up_req, &recv_up_status);
+    if( local_gsz != nx) {
+
     for(ii = local_gsz - nx; ii < local_gsz; ii++) {
       ri = local_gsz - nx;
       // ri = ri * nx;
@@ -348,7 +350,7 @@ int main(int argc, char* argv[]) {
       x_w = (rj != 0) ? (rj - 1) : (nx - 1);
       x_e = (rj != nx - 1) ? (rj + 1) : 0;
 
-      float t[NSPEEDS]; //local_cells[ii];
+      double t[NSPEEDS]; //local_cells[ii];
 
       *t = local_cells[ii].speeds[0];
       *(t + 1) = local_cells[ri + x_w].speeds[1];
@@ -360,37 +362,37 @@ int main(int argc, char* argv[]) {
       *(t + 7) = hallo_1[x_e].speeds[7];
       *(t + 8) = hallo_1[x_w].speeds[8];
 
-      // if ( iii == 0 && rj == 0) {
-      //   printf("%d %d %d %f \n", ri, gsz_disp[rank] + ri, accel_area.idx*nx, t[0]);
-      // }
+      // // if ( iii == 0 && rj == 0) {
+      // //   printf("%d %d %d %f \n", ri, gsz_disp[rank] + ri, accel_area.idx*nx, t[0]);
+      // // }
       if(t[0] != -1) {
-        local_density = t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7] + t[8];
+        local_density = *(t + 0) + *(t + 1) + *(t + 2) + *(t + 3) + *(t + 4) + *(t + 5) + *(t + 6) + *(t + 7) + *(t + 8);
 
-        u[1] = (t[1] + t[5] + t[8] - (t[3] + t[6] + t[7])) / local_density;
+        *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7))) / local_density;
 
-        u[2] = (t[2] + t[5] + t[6] - (t[4] + t[7] + t[8])) / local_density;
+        *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8))) / local_density;
 
-        u[0] = u[1]*u[1] + u[2]*u[2];
+        *(u + 0) = *(u + 1)**(u + 1) + *(u + 2)**(u + 2);
 
         *(u + 3) = *(u + 1) + *(u + 2);
         *(u + 4) = -*(u + 1) + *(u + 2);
 
-        tot_u += sqrt(*u);
+        tot_u = (float) sqrt(*u) + tot_u;
 
         *u = 1.0f - 1.5f**u;
-        local_density = 0.4444444f*local_density*omega;
+        local_density = local_density*omega;
         // *u = local_density**u;
         t[0] = t[0] * minus_omega + local_density**u; 
         local_density *= 0.25f;
-        t[1] = t[1] * minus_omega + local_density * (u[0] + 4.5f * u[1] * u[1] + 3.0f * u[1]);
-        t[2] = t[2] * minus_omega + local_density * (u[0] + 4.5f * u[2] * u[2] + 3.0f * u[2]);
-        t[3] = t[3] * minus_omega + local_density * (u[0] + 4.5f * u[1] * u[1] - 3.0f * u[1]);
-        t[4] = t[4] * minus_omega + local_density * (u[0] + 4.5f * u[2] * u[2] - 3.0f * u[2]);
+        t[1] = t[1] * minus_omega + local_density * (u[0] +  4.50f * u[1] * u[1] + 3.0f * u[1]);
+        t[2] = t[2] * minus_omega + local_density * (u[0] +  4.50f * u[2] * u[2] + 3.0f * u[2]);
+        t[3] = t[3] * minus_omega + local_density * (u[0] +  4.50f * u[1] * u[1] - 3.0f * u[1]);
+        t[4] = t[4] * minus_omega + local_density * (u[0] +  4.50f * u[2] * u[2] - 3.0f * u[2]);
         local_density *= 0.25f;
-        t[5] = t[5] * minus_omega + local_density * (u[0] + 4.5f * u[3] * u[3] + 3.0f * u[3]);
-        t[6] = t[6] * minus_omega + local_density * (u[0] + 4.5f * u[4] * u[4] + 3.0f * u[4]);
-        t[7] = t[7] * minus_omega + local_density * (u[0] + 4.5f * u[3] * u[3] - 3.0f * u[3]);
-        t[8] = t[8] * minus_omega + local_density * (u[0] + 4.5f * u[4] * u[4] - 3.0f * u[4]);
+        t[5] = t[5] * minus_omega + local_density * (u[0] +  4.50f * u[3] * u[3] + 3.0f * u[3]);
+        t[6] = t[6] * minus_omega + local_density * (u[0] +  4.50f * u[4] * u[4] + 3.0f * u[4]);
+        t[7] = t[7] * minus_omega + local_density * (u[0] +  4.50f * u[3] * u[3] - 3.0f * u[3]);
+        t[8] = t[8] * minus_omega + local_density * (u[0] +  4.50f * u[4] * u[4] - 3.0f * u[4]);
         if (accel_area.col_or_row == 1 && rj == accel_area.idx) {
           if (
           (*(t + 4) - w1) > 0.0 &&
@@ -423,7 +425,7 @@ int main(int argc, char* argv[]) {
           }
         }
       }
-      // speed_t t_to_send;
+      // // speed_t t_to_send;
       local_tmp_cells[ii].speeds[0] = t[0];
       local_tmp_cells[ii].speeds[1] = (t[0] == -1) ? t[3] : t[1];
       local_tmp_cells[ii].speeds[2] = (t[0] == -1) ? t[4] : t[2];
@@ -434,6 +436,7 @@ int main(int argc, char* argv[]) {
       local_tmp_cells[ii].speeds[7] = (t[0] == -1) ? t[5] : t[7];
       local_tmp_cells[ii].speeds[8] = (t[0] == -1) ? t[6] : t[8];
       // local_tmp_cells[ii] = t_to_send;
+    }
     }
     // printf("%d finished?", MPI_Test(&req, &iii, &status));
     // MPI_Wait(&req, &status);
@@ -448,49 +451,49 @@ int main(int argc, char* argv[]) {
       x_w = (rj != 0) ? (rj - 1) : (nx - 1);
       x_e = (rj != nx - 1) ? (rj + 1) : 0;
 
-      float t[NSPEEDS]; //local_cells[ii];
+      double t[NSPEEDS]; //local_cells[ii];
 
       *t = local_cells[ii].speeds[0];
       *(t + 1) = local_cells[ri + x_w].speeds[1];
       *(t + 2) = hallo_2[rj].speeds[2];
       *(t + 3) = local_cells[ri + x_e].speeds[3];
-      *(t + 4) = local_cells[y_n + rj].speeds[4];
+      *(t + 4) = (local_gsz != nx) ? local_cells[y_n + rj].speeds[4] : hallo_1[rj].speeds[4];
       *(t + 5) = hallo_2[x_w].speeds[5];
       *(t + 6) = hallo_2[x_e].speeds[6];
-      *(t + 7) = local_cells[y_n + x_e].speeds[7];
-      *(t + 8) = local_cells[y_n + x_w].speeds[8];
+      *(t + 7) = (local_gsz != nx) ? local_cells[y_n + x_e].speeds[7] : hallo_1[x_e].speeds[7];
+      *(t + 8) = (local_gsz != nx) ? local_cells[y_n + x_w].speeds[8] : hallo_1[x_w].speeds[8];
 
       // if ( iii == 0 && rj == 0) {
       //   printf("%d %d %d %f \n", ri, gsz_disp[rank] + ri, accel_area.idx*nx, t[0]);
       // }
       if(t[0] != -1) {
-        local_density = t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7] + t[8];
+        local_density = *(t + 0) + *(t + 1) + *(t + 2) + *(t + 3) + *(t + 4) + *(t + 5) + *(t + 6) + *(t + 7) + *(t + 8);
 
-        u[1] = (t[1] + t[5] + t[8] - (t[3] + t[6] + t[7])) / local_density;
+        *(u + 1) = (*(t + 1) + *(t + 5) + *(t + 8) - (*(t + 3) + *(t + 6) + *(t + 7))) / local_density;
 
-        u[2] = (t[2] + t[5] + t[6] - (t[4] + t[7] + t[8])) / local_density;
+        *(u + 2) = (*(t + 2) + *(t + 5) + *(t + 6) - (*(t + 4) + *(t + 7) + *(t + 8))) / local_density;
 
-        u[0] = u[1]*u[1] + u[2]*u[2];
+        *(u + 0) = *(u + 1)**(u + 1) + *(u + 2)**(u + 2);
 
         *(u + 3) = *(u + 1) + *(u + 2);
         *(u + 4) = -*(u + 1) + *(u + 2);
 
-        tot_u += sqrt(*u);
+        tot_u = (float) sqrt(*u) + tot_u;
 
         *u = 1.0f - 1.5f**u;
-        local_density = 0.4444444f*local_density*omega;
+        local_density = local_density*omega;
         // *u = local_density**u;
         t[0] = t[0] * minus_omega + local_density**u; 
         local_density *= 0.25f;
-        t[1] = t[1] * minus_omega + local_density * (u[0] + 4.5f * u[1] * u[1] + 3.0f * u[1]);
-        t[2] = t[2] * minus_omega + local_density * (u[0] + 4.5f * u[2] * u[2] + 3.0f * u[2]);
-        t[3] = t[3] * minus_omega + local_density * (u[0] + 4.5f * u[1] * u[1] - 3.0f * u[1]);
-        t[4] = t[4] * minus_omega + local_density * (u[0] + 4.5f * u[2] * u[2] - 3.0f * u[2]);
+        t[1] = t[1] * minus_omega + local_density * (u[0] +  4.50f * u[1] * u[1] + 3.0f * u[1]);
+        t[2] = t[2] * minus_omega + local_density * (u[0] +  4.50f * u[2] * u[2] + 3.0f * u[2]);
+        t[3] = t[3] * minus_omega + local_density * (u[0] +  4.50f * u[1] * u[1] - 3.0f * u[1]);
+        t[4] = t[4] * minus_omega + local_density * (u[0] +  4.50f * u[2] * u[2] - 3.0f * u[2]);
         local_density *= 0.25f;
-        t[5] = t[5] * minus_omega + local_density * (u[0] + 4.5f * u[3] * u[3] + 3.0f * u[3]);
-        t[6] = t[6] * minus_omega + local_density * (u[0] + 4.5f * u[4] * u[4] + 3.0f * u[4]);
-        t[7] = t[7] * minus_omega + local_density * (u[0] + 4.5f * u[3] * u[3] - 3.0f * u[3]);
-        t[8] = t[8] * minus_omega + local_density * (u[0] + 4.5f * u[4] * u[4] - 3.0f * u[4]);
+        t[5] = t[5] * minus_omega + local_density * (u[0] +  4.50f * u[3] * u[3] + 3.0f * u[3]);
+        t[6] = t[6] * minus_omega + local_density * (u[0] +  4.50f * u[4] * u[4] + 3.0f * u[4]);
+        t[7] = t[7] * minus_omega + local_density * (u[0] +  4.50f * u[3] * u[3] - 3.0f * u[3]);
+        t[8] = t[8] * minus_omega + local_density * (u[0] +  4.50f * u[4] * u[4] - 3.0f * u[4]);
         if (accel_area.col_or_row == 1 && rj == accel_area.idx) {
           if (
           (*(t + 4) - w1) > 0.0 &&
@@ -633,7 +636,7 @@ int main(int argc, char* argv[]) {
 //     timstr=ru.ru_stime;
 //     systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
-//     printf("==done==\n");
+//     printf("==d1.0f==\n");
 //     printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,cells,obstacles));
 //     printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
 //     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
@@ -653,8 +656,8 @@ void write_values(const char * final_state_file, const char * av_vels_file,
     const float c_sq = 1.0/3.0;  /* sq. of speed of sound */
     float local_density;         /* per grid cell sum of densities */
     float pressure;              /* fluid pressure in grid cell */
-    float u_x;                   /* x-component of velocity in grid cell */
-    float u_y;                   /* y-component of velocity in grid cell */
+    float u_x;                   /* x-comp1.0fnt of velocity in grid cell */
+    float u_y;                   /* y-comp1.0fnt of velocity in grid cell */
     float u;                     /* norm--root of summed squares--of u_x and u_y */
 
     fp = fopen(final_state_file, "w");
@@ -684,7 +687,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
                     local_density += cells[ii*params.nx + jj].speeds[kk];
                 }
 
-                /* compute x velocity component */
+                /* compute x velocity comp1.0fnt */
                 u_x = (cells[ii*params.nx + jj].speeds[1] +
                         cells[ii*params.nx + jj].speeds[5] +
                         cells[ii*params.nx + jj].speeds[8]
@@ -693,7 +696,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
                         cells[ii*params.nx + jj].speeds[7]))
                     / local_density;
 
-                /* compute y velocity component */
+                /* compute y velocity comp1.0fnt */
                 u_y = (cells[ii*params.nx + jj].speeds[2] +
                         cells[ii*params.nx + jj].speeds[5] +
                         cells[ii*params.nx + jj].speeds[6]

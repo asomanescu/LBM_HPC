@@ -1,17 +1,18 @@
-CC=icc
-#CC=gcc
-#CFLAGS=-O3 -fopenmp
-CFLAGS= -O3 -qopenmp -no-prec-div -ipo -xHOST -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
-CEXT=
+CC=mpicc
+
+CFLAGS=-O3 -no-prec-div -ipo -xHOST -unroll-aggressive -m64 -auto-p32 -no-prec-sqrt -fp-model fast=2
+
 EXE=lbm
+
+USER_NAME=as13118
 
 PARAM_FILE=../inputs/box.params
 
 FINAL_STATE_FILE=./final_state.dat
 AV_VELS_FILE=./av_vels.dat
 
-REF_FINAL_STATE_FILE=../check/box.final_state.dat
-REF_AV_VELS_FILE=../check/box.av_vels.dat
+REF_FINAL_STATE_FILE=../check/large_pipe.final_state.dat
+REF_AV_VELS_FILE=../check/large_pipe.av_vels.dat
 
 LDLIBS=-lm
 
@@ -20,10 +21,10 @@ SUBMIT_FILES=Makefile lbm.c lbm.h simulation.c utils.c
 ENV_SCRIPT=env.sh
 
 $(EXE) : utils.o lbm.o simulation.o
-	$(CC) $(CFLAGS) $(CEXT) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 %.o: %.c Makefile lbm.h
-	$(CC) $(CFLAGS) $(CEXT) -o $@ -c $<
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 run: $(EXE)
 	./$(EXE) -a $(AV_VELS_FILE) -f $(FINAL_STATE_FILE) -p $(PARAM_FILE)
@@ -33,6 +34,12 @@ plot:
 
 check:
 	python ../check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) --ref-final-state-file=$(REF_FINAL_STATE_FILE) --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
+
+sub: $(EXE)
+	qsub lbm_job_submit
+
+s:
+	watch qstat -u $(USER_NAME)
 
 submission:
 	@if [ -e $(SUBMIT_DIR) ] ; \
@@ -58,4 +65,5 @@ submission:
 .PHONY: clean submission
 clean:
 	rm -f *.o $(EXE)
+	rm -f MPI.e* machine.file.* lbm.80s* *~
 

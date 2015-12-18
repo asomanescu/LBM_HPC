@@ -7,7 +7,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <getopt.h>
-#include <omp.h>
 
 #include "lbm.h"
 
@@ -96,8 +95,8 @@ void parse_args (int argc, char* argv[],
 }
 
 void initialise(const char* param_file, accel_area_t * accel_area,
-    param_t* params, float** cells_ptr, float** tmp_cells_ptr,
-    unsigned char** obstacles_ptr, float** av_vels_ptr, unsigned *total_cells, unsigned *heights_ptr)
+    param_t* params, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
+    int** obstacles_ptr, float** av_vels_ptr, unsigned *total_cells, unsigned *heights_ptr)
 {
     FILE   *fp;            /* file pointer */
     int    ii,jj, kk;          /* generic counters */
@@ -143,12 +142,12 @@ void initialise(const char* param_file, accel_area_t * accel_area,
 
     if (!(strcmp(accel_dir_buf, "row")))
     {
-        accel_area->col_or_row = ACCEL_ROW;
+        accel_area->col_or_row = 0;
         accel_area->idx = idx*(params->ny/BOX_Y_SIZE);
     }
     else if (!(strcmp(accel_dir_buf, "column")))
     {
-        accel_area->col_or_row = ACCEL_COLUMN;
+        accel_area->col_or_row = 1;
         accel_area->idx = idx*(params->nx/BOX_X_SIZE);
     }
     else
@@ -180,13 +179,13 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     fclose(fp);
 
     /* Allocate arrays */
-    *cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*9));
+    *cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
     if (*cells_ptr == NULL) DIE("Cannot allocate memory for cells");
 
-    *tmp_cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*9));
+    *tmp_cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
     if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
 
-    *obstacles_ptr = (unsigned char*) malloc(sizeof(unsigned char)*(params->ny*params->nx));
+    *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
     if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
 
     *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters));
@@ -197,20 +196,29 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     w2 = params->density      /36.0;
 
     /* Initialise arrays */
-    #pragma omp parallel for
-        for (ii = 0; ii< (params->ny*params->nx); ii++) {
-            (*cells_ptr)[ii] = w0;	
-            (*obstacles_ptr)[ii] = 0;
+    for (ii = 0; ii < params->ny; ii++)
+    {
+        for (jj = 0; jj < params->nx; jj++)
+        {
+            /* centre */
+            (*cells_ptr)[ii*params->nx + jj].speeds[0] = w0;
+            /* axis directions */
+            (*cells_ptr)[ii*params->nx + jj].speeds[1] = w1;
+            (*cells_ptr)[ii*params->nx + jj].speeds[2] = w1;
+            (*cells_ptr)[ii*params->nx + jj].speeds[3] = w1;
+            (*cells_ptr)[ii*params->nx + jj].speeds[4] = w1;
+            /* diagonals */
+            (*cells_ptr)[ii*params->nx + jj].speeds[5] = w2;
+            (*cells_ptr)[ii*params->nx + jj].speeds[6] = w2;
+            (*cells_ptr)[ii*params->nx + jj].speeds[7] = w2;
+            (*cells_ptr)[ii*params->nx + jj].speeds[8] = w2;
+
+            (*obstacles_ptr)[ii*params->nx + jj] = 0;
         }
-    for (ii = (params->ny*params->nx); ii < (params->ny*params->nx*5); ii++) {
-        (*cells_ptr)[ii] = w1;
-    }
-    for (ii = (params->ny*params->nx*5); ii < (params->ny*params->nx*9); ii++) {
-        (*cells_ptr)[ii] = w2;
     }
 
     *total_cells = params->ny * params->nx;
-    heights_ptr[0] = heights_ptr[1] = heights_ptr[2] = heights_ptr[3] = 0;
+    heights_ptr[0] = 0;
     int first_obst = 0;
     /* Fill in locations of obstacles */
     for (ii = 0; ii < params->ny; ii++)
@@ -220,6 +228,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
             /* coordinates of (jj, ii) scaled to 'real world' terms */
             const float x_pos = jj*(BOX_X_SIZE/params->nx);
             const float y_pos = ii*(BOX_Y_SIZE/params->ny);
+
             int obst = 0;
             for (kk = 0; kk < n_obstacles; kk++)
             {
@@ -228,7 +237,8 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos >= obstacles[kk].obs_y_min &&
                     y_pos <  obstacles[kk].obs_y_max)
                 {
-                    (*obstacles_ptr)[ii*params->nx + jj] = 1;
+                    // (*obstacles_ptr)[ii*params->nx + jj] = 1;
+                    (*cells_ptr)[ii*params->nx + jj].speeds[0] = -1;
                     *total_cells = *total_cells - 1;
                     obst = 1;
                 }
@@ -242,15 +252,74 @@ void initialise(const char* param_file, accel_area_t * accel_area,
             }
         }
     }
+
+    // printf("%d %d %d \n", heights_ptr[1], heights_ptr[0], heights_ptr[1] - heights_ptr[0]);
+
     if(heights_ptr[0] != 0)  heights_ptr[0] -= 1;
-    else heights_ptr[2] = 1;
-    if (heights_ptr[1] != params->nx) heights_ptr[1] += 1;
-    else heights_ptr[3] = 1;
+    else heights_ptr[1] = params->ny;
+    if(heights_ptr[1] != params->ny) heights_ptr[1] += 1;
+    else heights_ptr[0] = 0;
+
+    //heights_ptr[0] = 0;
+    //heights_ptr[1] = params->ny;
+
+
+    float wx1 = params->density * params->accel / 9.0;
+    float wx2 = params->density * params->accel / 36.0;
+
+    if (accel_area->col_or_row == ACCEL_COLUMN)
+    {
+        jj = accel_area->idx;
+
+        for (ii = 0; ii < params->ny; ii++)
+        {
+            /* if the cell is not occupied and
+            ** we don't send a density negative */
+            if ((*cells_ptr)[ii*params->nx + jj].speeds[0] != -1 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[4] - wx1) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[7] - wx2) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[8] - wx2) > 0.0 )
+            {
+                /* increase 'north-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[2] += wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[5] += wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[6] += wx2;
+                /* decrease 'south-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[4] -= wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[7] -= wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[8] -= wx2;
+            }
+        }
+    }
+    else
+    {
+        ii = accel_area->idx;
+
+        for (jj = 0; jj < params->nx; jj++)
+        {
+            /* if the cell is not occupied and
+            ** we don't send a density negative */
+            if ((*cells_ptr)[ii*params->nx + jj].speeds[0] != -1 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[3] - wx1) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[6] - wx2) > 0.0 &&
+            ((*cells_ptr)[ii*params->nx + jj].speeds[7] - wx2) > 0.0 )
+            {
+                /* increase 'east-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[1] += wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[5] += wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[8] += wx2;
+                /* decrease 'west-side' densities */
+                (*cells_ptr)[ii*params->nx + jj].speeds[3] -= wx1;
+                (*cells_ptr)[ii*params->nx + jj].speeds[6] -= wx2;
+                (*cells_ptr)[ii*params->nx + jj].speeds[7] -= wx2;
+            }
+        }
+    }
     free(obstacles);
 }
 
-void finalise(float** cells_ptr, float** tmp_cells_ptr,
-    unsigned char** obstacles_ptr, float** av_vels_ptr)
+void finalise(speed_t** cells_ptr, speed_t** tmp_cells_ptr,
+    int** obstacles_ptr, float** av_vels_ptr)
 {
     /* Free allocated memory */
     free(*cells_ptr);
@@ -258,5 +327,4 @@ void finalise(float** cells_ptr, float** tmp_cells_ptr,
     free(*obstacles_ptr);
     free(*av_vels_ptr);
 }
-
 
